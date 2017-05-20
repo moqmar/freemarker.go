@@ -1,4 +1,5 @@
 {
+	"WhatIsThis": "https://github.com/b3log/header",
     "Dir": ".",
     "Template": "header.txt",
     "Includes": [
