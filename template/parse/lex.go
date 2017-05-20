@@ -236,7 +236,7 @@ const (
 	rightDirective       = ">"
 )
 
-// state functions
+// State functions.
 
 // lexText scans until an opening interpolation "${", comment "<#--" or directive "<#".
 func lexText(l *lexer) stateFn {

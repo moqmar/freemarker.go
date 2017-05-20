@@ -57,69 +57,68 @@ func (t NodeType) Type() NodeType {
 const (
 	NodeText       NodeType = iota // plain text
 	NodeIf                         // if directive
-	NodeAction                     // a non-control action such as a field evaluation
 	NodeBool                       // boolean constant
 	NodeChain                      // sequence of field accesses
-	NodeCommand                    // element of a pipeline
+	NodeExpression                 // expression
 	nodeElse                       // else action. Not added to tree
 	nodeEnd                        // end action. Not added to tree
 	NodeIdentifier                 // identifier; always a function name
-	NodeList                       // list of Nodes
+	NodeContent                    // list of Nodes
 	NodeNil                        // untyped nil constant
 	NodeNumber                     // numerical constant
-	NodePipe                       // pipeline of commands
-	NodeRange                      // range action
+	NodeList                       // list directive
 	NodeString                     // string constant
 	NodeTemplate                   // template invocation action
 	NodeVariable                   // $ variable
-	NodeWith                       // with action
 )
 
 // Nodes.
 
-// ListNode holds a sequence of nodes.
-type ListNode struct {
+// ContentNode holds a sequence of nodes.
+type ContentNode struct {
 	NodeType
 	Pos
 	tr    *Tree
-	Nodes []Node // The element nodes in lexical order.
+	Nodes []Node // element nodes in lexical order
 }
 
-func (t *Tree) newList(pos Pos) *ListNode {
-	return &ListNode{tr: t, NodeType: NodeList, Pos: pos}
+func (t *Tree) newContent(pos Pos) *ContentNode {
+	return &ContentNode{tr: t, NodeType: NodeList, Pos: pos}
 }
 
-func (l *ListNode) append(n Node) {
-	l.Nodes = append(l.Nodes, n)
+func (c *ContentNode) append(n Node) {
+	c.Nodes = append(c.Nodes, n)
 }
 
-func (l *ListNode) tree() *Tree {
-	return l.tr
+func (c *ContentNode) tree() *Tree {
+	return c.tr
 }
 
-func (l *ListNode) String() string {
+func (c *ContentNode) String() string {
 	b := &bytes.Buffer{}
 
-	for _, n := range l.Nodes {
+	for _, n := range c.Nodes {
 		fmt.Fprint(b, n)
 	}
 
 	return b.String()
 }
 
-func (l *ListNode) CopyList() *ListNode {
-	if l == nil {
-		return l
+func (c *ContentNode) CopyContent() *ContentNode {
+	if c == nil {
+		return c
 	}
-	n := l.tr.newList(l.Pos)
-	for _, elem := range l.Nodes {
+
+	n := c.tr.newContent(c.Pos)
+	for _, elem := range c.Nodes {
 		n.append(elem.Copy())
 	}
+
 	return n
 }
 
-func (l *ListNode) Copy() Node {
-	return l.CopyList()
+func (c *ContentNode) Copy() Node {
+	return c.CopyContent()
 }
 
 // TextNode holds plain text.
@@ -149,143 +148,50 @@ func (t *TextNode) Copy() Node {
 type ExpressionNode struct {
 	NodeType
 	Pos
-	tr *Tree
+	tr    *Tree
+	Nodes []Node
 }
 
-// PipeNode holds a pipeline with optional declaration
-type PipeNode struct {
-	NodeType
-	Pos
-	tr   *Tree
-	Line int             // The line number in the input. Deprecated: Kept for compatibility.
-	Decl []*VariableNode // Variable declarations in lexical order.
-	Cmds []*CommandNode  // The commands in lexical order.
+func (t *Tree) newExpression(pos Pos) *ExpressionNode {
+	return &ExpressionNode{tr: t, NodeType: NodeExpression, Pos: pos}
 }
 
-func (t *Tree) newPipeline(pos Pos, line int, decl []*VariableNode) *PipeNode {
-	return &PipeNode{tr: t, NodeType: NodePipe, Pos: pos, Line: line, Decl: decl}
+func (c *ExpressionNode) append(node Node) {
+	c.Nodes = append(c.Nodes, node)
 }
 
-func (p *PipeNode) append(command *CommandNode) {
-	p.Cmds = append(p.Cmds, command)
-}
-
-func (p *PipeNode) String() string {
+func (c *ExpressionNode) String() string {
 	s := ""
-	if len(p.Decl) > 0 {
-		for i, v := range p.Decl {
-			if i > 0 {
-				s += ", "
-			}
-			s += v.String()
-		}
-		s += " := "
-	}
-	for i, c := range p.Cmds {
-		if i > 0 {
-			s += " | "
-		}
-		s += c.String()
-	}
-	return s
-}
-
-func (p *PipeNode) tree() *Tree {
-	return p.tr
-}
-
-func (p *PipeNode) CopyPipe() *PipeNode {
-	if p == nil {
-		return p
-	}
-	var decl []*VariableNode
-	for _, d := range p.Decl {
-		decl = append(decl, d.Copy().(*VariableNode))
-	}
-	n := p.tr.newPipeline(p.Pos, p.Line, decl)
-	for _, c := range p.Cmds {
-		n.append(c.Copy().(*CommandNode))
-	}
-	return n
-}
-
-func (p *PipeNode) Copy() Node {
-	return p.CopyPipe()
-}
-
-// ActionNode holds an action (something bounded by delimiters).
-// Control actions have their own nodes; ActionNode represents simple
-// ones such as field evaluations and parenthesized pipelines.
-type ActionNode struct {
-	NodeType
-	Pos
-	tr   *Tree
-	Line int       // The line number in the input. Deprecated: Kept for compatibility.
-	Pipe *PipeNode // The pipeline in the action.
-}
-
-func (t *Tree) newAction(pos Pos, line int, pipe *PipeNode) *ActionNode {
-	return &ActionNode{tr: t, NodeType: NodeAction, Pos: pos, Line: line, Pipe: pipe}
-}
-
-func (a *ActionNode) String() string {
-	return fmt.Sprintf("{{%s}}", a.Pipe)
-
-}
-
-func (a *ActionNode) tree() *Tree {
-	return a.tr
-}
-
-func (a *ActionNode) Copy() Node {
-	return a.tr.newAction(a.Pos, a.Line, a.Pipe.CopyPipe())
-
-}
-
-// CommandNode holds a command (a pipeline inside an evaluating action).
-type CommandNode struct {
-	NodeType
-	Pos
-	tr   *Tree
-	Args []Node // Arguments in lexical order: Identifier, field, or constant.
-}
-
-func (t *Tree) newCommand(pos Pos) *CommandNode {
-	return &CommandNode{tr: t, NodeType: NodeCommand, Pos: pos}
-}
-
-func (c *CommandNode) append(arg Node) {
-	c.Args = append(c.Args, arg)
-}
-
-func (c *CommandNode) String() string {
-	s := ""
-	for i, arg := range c.Args {
+	for i, node := range c.Nodes {
 		if i > 0 {
 			s += " "
 		}
-		if arg, ok := arg.(*PipeNode); ok {
-			s += "(" + arg.String() + ")"
+		if node, ok := node.(*ExpressionNode); ok {
+			s += "(" + node.String() + ")"
 			continue
 		}
-		s += arg.String()
+		s += node.String()
 	}
 	return s
 }
 
-func (c *CommandNode) tree() *Tree {
+func (c *ExpressionNode) tree() *Tree {
 	return c.tr
 }
 
-func (c *CommandNode) Copy() Node {
+func (c *ExpressionNode) CopyExpr() *ExpressionNode {
 	if c == nil {
 		return c
 	}
-	n := c.tr.newCommand(c.Pos)
-	for _, c := range c.Args {
+	n := c.tr.newExpression(c.Pos)
+	for _, c := range c.Nodes {
 		n.append(c.Copy())
 	}
 	return n
+}
+
+func (c *ExpressionNode) Copy() Node {
+	return c.CopyExpr()
 }
 
 // IdentifierNode holds an identifier.
@@ -311,7 +217,6 @@ func (i *IdentifierNode) SetPos(pos Pos) *IdentifierNode {
 
 // SetTree sets the parent tree for the node. NewIdentifier is a public method so we can't modify its signature.
 // Chained for convenience.
-// TODO: fix one day?
 func (i *IdentifierNode) SetTree(t *Tree) *IdentifierNode {
 	i.tr = t
 	return i
@@ -359,36 +264,6 @@ func (v *VariableNode) tree() *Tree {
 
 func (v *VariableNode) Copy() Node {
 	return &VariableNode{tr: v.tr, NodeType: NodeVariable, Pos: v.Pos, Ident: append([]string{}, v.Ident...)}
-}
-
-// DotNode holds the special identifier '.'.
-type DotNode struct {
-	NodeType
-	Pos
-	tr *Tree
-}
-
-func (t *Tree) newDot(pos Pos) *DotNode {
-	return &DotNode{tr: t, NodeType: NodeDot, Pos: pos}
-}
-
-func (d *DotNode) Type() NodeType {
-	// Override method on embedded NodeType for API compatibility.
-	// TODO: Not really a problem; could change API without effect but
-	// api tool complains.
-	return NodeDot
-}
-
-func (d *DotNode) String() string {
-	return "."
-}
-
-func (d *DotNode) tree() *Tree {
-	return d.tr
-}
-
-func (d *DotNode) Copy() Node {
-	return d.tr.newDot(d.Pos)
 }
 
 // NilNode holds the special identifier 'nil' representing an untyped nil constant.
@@ -450,7 +325,7 @@ func (c *ChainNode) Add(field string) {
 
 func (c *ChainNode) String() string {
 	s := c.Node.String()
-	if _, ok := c.Node.(*PipeNode); ok {
+	if _, ok := c.Node.(*ExpressionNode); ok {
 		s = "(" + s + ")"
 	}
 	for _, field := range c.Field {
@@ -683,12 +558,11 @@ func (e *endNode) Copy() Node {
 type elseNode struct {
 	NodeType
 	Pos
-	tr   *Tree
-	Line int // The line number in the input. Deprecated: Kept for compatibility.
+	tr *Tree
 }
 
-func (t *Tree) newElse(pos Pos, line int) *elseNode {
-	return &elseNode{tr: t, NodeType: nodeElse, Pos: pos, Line: line}
+func (t *Tree) newElse(pos Pos) *elseNode {
+	return &elseNode{tr: t, NodeType: nodeElse, Pos: pos}
 }
 
 func (e *elseNode) Type() NodeType {
@@ -704,125 +578,59 @@ func (e *elseNode) tree() *Tree {
 }
 
 func (e *elseNode) Copy() Node {
-	return e.tr.newElse(e.Pos, e.Line)
+	return e.tr.newElse(e.Pos)
 }
 
-// BranchNode is the common representation of if, range, and with.
-type BranchNode struct {
-	NodeType
-	Pos
-	tr       *Tree
-	Line     int       // The line number in the input. Deprecated: Kept for compatibility.
-	Pipe     *PipeNode // The pipeline to be evaluated.
-	List     *ListNode // What to execute if the value is non-empty.
-	ElseList *ListNode // What to execute if the value is empty (nil if absent).
-}
-
-func (b *BranchNode) String() string {
-	name := ""
-	switch b.NodeType {
-	case NodeIf:
-		name = "if"
-	case NodeRange:
-		name = "range"
-	case NodeWith:
-		name = "with"
-	default:
-		panic("unknown branch type")
-	}
-	if b.ElseList != nil {
-		return fmt.Sprintf("{{%s %s}}%s{{else}}%s{{end}}", name, b.Pipe, b.List, b.ElseList)
-	}
-	return fmt.Sprintf("{{%s %s}}%s{{end}}", name, b.Pipe, b.List)
-}
-
-func (b *BranchNode) tree() *Tree {
-	return b.tr
-}
-
-func (b *BranchNode) Copy() Node {
-	switch b.NodeType {
-	case NodeIf:
-		return b.tr.newIf(b.Pos, b.Line, b.Pipe, b.List, b.ElseList)
-	case NodeRange:
-		return b.tr.newRange(b.Pos, b.Line, b.Pipe, b.List, b.ElseList)
-	case NodeWith:
-		return b.tr.newWith(b.Pos, b.Line, b.Pipe, b.List, b.ElseList)
-	default:
-		panic("unknown branch type")
-	}
-}
-
-// IfNode represents an <#if> directive and its commands.
+// IfNode represents a <#if> directive.
 type IfNode struct {
 	NodeType
 	Pos
-	tr       *Tree
-	Line     int       // The line number in the input. Deprecated: Kept for compatibility.
-	Pipe     *PipeNode // the expression to be evaluated.
-	List     *ListNode // What to execute if the value is non-empty.
-	ElseList *ListNode // What to execute if the value is empty (nil if absent).
+	tr          *Tree
+	Expr        *ExpressionNode
+	Content     *ContentNode
+	ElseContent *ContentNode
 }
 
-func (t *Tree) newIf(pos Pos, line int, pipe *PipeNode, list, elseList *ListNode) *IfNode {
-	return &IfNode{BranchNode{tr: t, NodeType: NodeIf, Pos: pos, Line: line, Pipe: pipe, List: list, ElseList: elseList}}
+func (t *Tree) newIf(pos Pos, expr *ExpressionNode, content, elseContent *ContentNode) *IfNode {
+	return &IfNode{tr: t, NodeType: NodeIf, Pos: pos,
+		Expr: expr, Content: content, ElseContent: elseContent}
 }
 
-func (i *IfNode) Copy() Node {
-	return i.tr.newIf(i.Pos, i.Line, i.Pipe.CopyPipe(), i.List.CopyList(), i.ElseList.CopyList())
+func (t *IfNode) String() string {
+	return fmt.Sprintf("<#if %s>", t.Expr)
 }
 
-// RangeNode represents a {{range}} action and its commands.
-type RangeNode struct {
-	BranchNode
-}
-
-func (t *Tree) newRange(pos Pos, line int, pipe *PipeNode, list, elseList *ListNode) *RangeNode {
-	return &RangeNode{BranchNode{tr: t, NodeType: NodeRange, Pos: pos, Line: line, Pipe: pipe, List: list, ElseList: elseList}}
-}
-
-func (r *RangeNode) Copy() Node {
-	return r.tr.newRange(r.Pos, r.Line, r.Pipe.CopyPipe(), r.List.CopyList(), r.ElseList.CopyList())
-}
-
-// WithNode represents a {{with}} action and its commands.
-type WithNode struct {
-	BranchNode
-}
-
-func (t *Tree) newWith(pos Pos, line int, pipe *PipeNode, list, elseList *ListNode) *WithNode {
-	return &WithNode{BranchNode{tr: t, NodeType: NodeWith, Pos: pos, Line: line, Pipe: pipe, List: list, ElseList: elseList}}
-}
-
-func (w *WithNode) Copy() Node {
-	return w.tr.newWith(w.Pos, w.Line, w.Pipe.CopyPipe(), w.List.CopyList(), w.ElseList.CopyList())
-}
-
-// TemplateNode represents a {{template}} action.
-type TemplateNode struct {
-	NodeType
-	Pos
-	tr   *Tree
-	Line int       // The line number in the input. Deprecated: Kept for compatibility.
-	Name string    // The name of the template (unquoted).
-	Pipe *PipeNode // The command to evaluate as dot for the template.
-}
-
-func (t *Tree) newTemplate(pos Pos, line int, name string, pipe *PipeNode) *TemplateNode {
-	return &TemplateNode{tr: t, NodeType: NodeTemplate, Pos: pos, Line: line, Name: name, Pipe: pipe}
-}
-
-func (t *TemplateNode) String() string {
-	if t.Pipe == nil {
-		return fmt.Sprintf("{{template %q}}", t.Name)
-	}
-	return fmt.Sprintf("{{template %q %s}}", t.Name, t.Pipe)
-}
-
-func (t *TemplateNode) tree() *Tree {
+func (t *IfNode) tree() *Tree {
 	return t.tr
 }
 
-func (t *TemplateNode) Copy() Node {
-	return t.tr.newTemplate(t.Pos, t.Line, t.Name, t.Pipe.CopyPipe())
+func (i *IfNode) Copy() Node {
+	return i.tr.newIf(i.Pos, i.Expr.CopyExpr(), i.Content.CopyContent(), i.ElseContent.CopyContent())
+}
+
+// ListNode represents a <#list> directive.
+type ListNode struct {
+	NodeType
+	Pos
+	tr          *Tree
+	Expr        *ExpressionNode
+	Content     *ContentNode
+	ElseContent *ContentNode
+}
+
+func (t *Tree) newList(pos Pos, expr *ExpressionNode, content *ContentNode, elseContent *ContentNode) *ListNode {
+	return &ListNode{tr: t, NodeType: NodeList, Pos: pos,
+		Expr: expr, Content: content, ElseContent: elseContent}
+}
+
+func (t *ListNode) String() string {
+	return fmt.Sprintf("<#list %s>%s</#list>", t.Expr, t.Content)
+}
+
+func (t *ListNode) tree() *Tree {
+	return t.tr
+}
+
+func (l *ListNode) Copy() Node {
+	return l.tr.newList(l.Pos, l.Expr.CopyExpr(), l.Content.CopyContent(), l.ElseContent.CopyContent())
 }
