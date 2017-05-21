@@ -517,7 +517,7 @@ func (t *Tree) exprNode() *ExpressionNode {
 		case itemIdentifier:
 			node = NewIdentifier(token.val).SetTree(t).SetPos(token.pos)
 		case itemEq:
-			node =
+			//node =
 		case itemBool:
 			node = t.newBool(token.pos, token.val == "true")
 		case itemCharConstant, itemNumber:
@@ -584,3 +584,24 @@ func (t *Tree) useVar(pos Pos, name string) Node {
 	t.errorf("undefined variable %q", v.Ident[0])
 	return nil
 }
+
+type itemStack struct {
+	items []*item
+	count int
+}
+
+func (s *itemStack) push(e *item) {
+	s.items = append(s.items[:s.count], e)
+	s.count++
+}
+
+func (s *itemStack) pop() *item {
+	if s.count == 0 {
+		return nil
+	}
+
+	s.count--
+
+	return s.items[s.count]
+}
+

@@ -23,16 +23,15 @@ import (
 	"unicode/utf8"
 )
 
-// Pos represents a byte position in the original input text from which
-// this template was parsed.
+// Pos represents a byte position in the original input text from which this template was parsed.
 type Pos int
 
 // item represents a token or text string returned from the scanner.
 type item struct {
-	typ  itemType // The type of this item
-	pos  Pos      // The starting position, in bytes, of this item in the input string
-	val  string   // The value of this item, aka lexeme
-	line int      // The line number at the start of this item
+	typ  itemType // the type of this item
+	pos  Pos      // the starting position, in bytes, of this item in the input string
+	val  string   // the value of this item, aka lexeme
+	line int      // the line number at the start of this item
 }
 
 func (i item) String() string {
@@ -55,13 +54,16 @@ type itemType int
 
 // Make the types pretty print.
 var itemName = map[itemType]string{
-	itemError:      "error",
-	itemBool:       "bool",
-	itemEOF:        "EOF",
-	itemIdentifier: "identifier",
-	itemEq:         "==",
-	itemNeq:        "!=",
-
+	itemError:          "error",
+	itemBool:           "bool",
+	itemEOF:            "EOF",
+	itemIdentifier:     "identifier",
+	itemEq:             "==",
+	itemNeq:            "!=",
+	itemAdd:            "+",
+	itemMinus:          "-",
+	itemMultiply:       "*",
+	itemDivide:         "/",
 	itemCharConstant:   "char",
 	itemStringConstant: "string",
 	itemNumber:         "number",
@@ -93,6 +95,10 @@ const (
 	itemIdentifier                     // alphanumeric identifier
 	itemText                           // plain text
 	itemNumber                         // simple number, including imaginary
+	itemAdd                            // +
+	itemMinus                          // -
+	itemMultiply                       // *
+	itemDivide                         // /
 	itemCharConstant                   // character constant
 	itemStringConstant                 // string constant
 	itemSpace                          // run of spaces separating arguments

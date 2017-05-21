@@ -22,6 +22,29 @@ import (
 	"testing"
 )
 
+func TestStack(t *testing.T) {
+	e1 := mkItem(itemNumber, "1")
+	e2 := mkItem(itemAdd, "+")
+	e3 := mkItem(itemAdd, "2")
+
+	s := &itemStack{}
+	s.push(&e1)
+	s.push(&e2)
+	s.push(&e3)
+
+	if "2" != s.pop().val {
+		t.Log("unexpected stack item")
+	}
+
+	if "+" != s.pop().val {
+		t.Log("unexpected stack item")
+	}
+
+	if "1" != s.pop().val {
+		t.Log("unexpected stack item")
+	}
+}
+
 var debug = flag.Bool("debug", true, "show the errors produced by the main tests")
 
 //type numberTest struct {
