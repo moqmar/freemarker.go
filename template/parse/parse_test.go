@@ -207,7 +207,7 @@ var parseTests = []parseTest{
 	//		`{{(.Y .Z).Field}}`},
 	//	{"simple if", "{{if .X}}hello{{end}}", noError,
 	//		`{{if .X}}"hello"{{end}}`},
-	{"if", "<#if a == b>true</#if>", noError,
+	{"simple if", "<#if a == b>true content</#if>following content", noError,
 		`{{if .X}}"true"{{else}}"false"{{end}}`},
 	//	{"if with else", "{{if .X}}true{{else}}false{{end}}", noError,
 	//		`{{if .X}}"true"{{else}}"false"{{end}}`},

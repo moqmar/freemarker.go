@@ -17,40 +17,8 @@
 package parse
 
 import (
-	"fmt"
 	"testing"
 )
-
-// Make the types prettyprint.
-var itemName = map[itemType]string{
-	itemError:      "error",
-	itemBool:       "bool",
-	itemExpression: "expression",
-	itemEOF:        "EOF",
-	itemIdentifier: "identifier",
-
-	itemCharConstant:   "char",
-	itemStringConstant: "string",
-	itemNumber:         "number",
-	itemLeftParen:      "(",
-	itemRightParen:     ")",
-	itemSpace:          "space",
-	itemText:           "text",
-
-	// directives
-	itemDirectiveIf:     "if",
-	itemDirectiveElseif: "elseif",
-	itemDirectiveElse:   "else",
-	itemDirectiveList:   "list",
-}
-
-func (i itemType) String() string {
-	s := itemName[i]
-	if s == "" {
-		return fmt.Sprintf("item%d", int(i))
-	}
-	return s
-}
 
 type lexTest struct {
 	name  string
@@ -66,11 +34,12 @@ func mkItem(typ itemType, text string) item {
 }
 
 var (
-	tEOF    = mkItem(itemEOF, "")
-	tLinter = mkItem(itemLeftInterpolation, "${")
-	tRinter = mkItem(itemRightInterpolation, "}")
-	tLdir   = mkItem(itemLeftDirective, "<#")
-	tRdir   = mkItem(itemRightDirective, ">")
+	tEOF      = mkItem(itemEOF, "")
+	tLinter   = mkItem(itemLeftInterpolation, "${")
+	tRinter   = mkItem(itemRightInterpolation, "}")
+	tStartDir = mkItem(itemStartDirective, "<#")
+	tCloseDir = mkItem(itemCloseDirective, ">")
+	tEndDir   = mkItem(itemEndDirective, "</#")
 
 	tLpar    = mkItem(itemLeftParen, "(")
 	tRpar    = mkItem(itemRightParen, ")")
@@ -109,7 +78,7 @@ var lexTests = []lexTest{
 		tEOF,
 	}},
 	{"list", "<#list animals as animal>", []item{
-		tLdir,
+		tStartDir,
 		tList,
 		tSpace,
 		mkItem(itemIdentifier, "animals"),
@@ -117,10 +86,10 @@ var lexTests = []lexTest{
 		tAs,
 		tSpace,
 		mkItem(itemIdentifier, "animal"),
-		tRdir,
+		tCloseDir,
 		tEOF}},
 	{"char", `<#if 'a' != 'b'>`, []item{
-		tLdir,
+		tStartDir,
 		tIf,
 		tSpace,
 		mkItem(itemCharConstant, `'a'`),
@@ -128,11 +97,11 @@ var lexTests = []lexTest{
 		tNeq,
 		tSpace,
 		mkItem(itemCharConstant, `'b'`),
-		tRdir,
+		tCloseDir,
 		tEOF,
 	}},
 	{"string", `<#if "a" == "b">`, []item{
-		tLdir,
+		tStartDir,
 		tIf,
 		tSpace,
 		mkItem(itemStringConstant, `"a"`),
@@ -140,102 +109,29 @@ var lexTests = []lexTest{
 		tEq,
 		tSpace,
 		mkItem(itemStringConstant, `"b"`),
-		tRdir,
+		tCloseDir,
 		tEOF,
 	}},
 	{"bools", "<#if true>", []item{
-		tLdir,
+		tStartDir,
 		tIf,
 		tSpace,
 		mkItem(itemBool, "true"),
-		tRdir,
+		tCloseDir,
 		tEOF,
 	}},
-	//	{"variable invocation", "{{$x 23}}", []item{
-	//		tLeft,
-	//		mkItem(itemVariable, "$x"),
-	//		tSpace,
-	//		mkItem(itemNumber, "23"),
-	//		tRight,
-	//		tEOF,
-	//	}},
-
-	//	{"declaration", "{{$v := 3}}", []item{
-	//		tLeft,
-	//		mkItem(itemVariable, "$v"),
-	//		tSpace,
-	//		mkItem(itemColonEquals, ":="),
-	//		tSpace,
-	//		mkItem(itemNumber, "3"),
-	//		tRight,
-	//		tEOF,
-	//	}},
-	//	{"2 declarations", "{{$v , $w := 3}}", []item{
-	//		tLeft,
-	//		mkItem(itemVariable, "$v"),
-	//		tSpace,
-	//		mkItem(itemChar, ","),
-	//		tSpace,
-	//		mkItem(itemVariable, "$w"),
-	//		tSpace,
-	//		mkItem(itemColonEquals, ":="),
-	//		tSpace,
-	//		mkItem(itemNumber, "3"),
-	//		tRight,
-	//		tEOF,
-	//	}},
-	//	{"field of parenthesized expression", "{{(.X).Y}}", []item{
-	//		tLeft,
-	//		tLpar,
-	//		mkItem(itemField, ".X"),
-	//		tRpar,
-	//		mkItem(itemField, ".Y"),
-	//		tRight,
-	//		tEOF,
-	//	}},
-	// errors
-	//	{"badchar", "#{{\x01}}", []item{
-	//		mkItem(itemText, "#"),
-	//		tLeft,
-	//		mkItem(itemError, "unrecognized character in action: U+0001"),
-	//	}},
-	//	{"unclosed action", "{{\n}}", []item{
-	//		tLeft,
-	//		mkItem(itemError, "unclosed action"),
-	//	}},
-	//	{"EOF in action", "{{range", []item{
-	//		tLeft,
-	//		tRange,
-	//		mkItem(itemError, "unclosed action"),
-	//	}},
-	//	{"unclosed quote", "{{\"\n\"}}", []item{
-	//		tLeft,
-	//		mkItem(itemError, "unterminated quoted string"),
-	//	}},
-	//	{"unclosed raw quote", "{{`xx}}", []item{
-	//		tLeft,
-	//		mkItem(itemError, "unterminated raw quoted string"),
-	//	}},
-	//	{"unclosed char constant", "{{'\n}}", []item{
-	//		tLeft,
-	//		mkItem(itemError, "unterminated character constant"),
-	//	}},
-	//	{"bad number", "{{3k}}", []item{
-	//		tLeft,
-	//		mkItem(itemError, `bad number syntax: "3k"`),
-	//	}},
-	//	{"unclosed paren", "{{(3}}", []item{
-	//		tLeft,
-	//		tLpar,
-	//		mkItem(itemNumber, "3"),
-	//		mkItem(itemError, `unclosed left paren`),
-	//	}},
-	//	{"extra right paren", "{{3)}}", []item{
-	//		tLeft,
-	//		mkItem(itemNumber, "3"),
-	//		tRpar,
-	//		mkItem(itemError, `unexpected right paren U+0029 ')'`),
-	//	}},
+	{"end if", "<#if true>true content</#if>", []item{
+		tStartDir,
+		tIf,
+		tSpace,
+		mkItem(itemBool, "true"),
+		tCloseDir,
+		mkItem(itemText, "true content"),
+		tEndDir,
+		tIf,
+		tCloseDir,
+		tEOF,
+	}},
 
 	{"text with bad comment", "hello<#--world", []item{
 		mkItem(itemText, "hello"),

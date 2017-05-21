@@ -34,12 +34,10 @@ type Tree struct {
 	ParseName string       // name of the top-level template during parsing, for error messages
 	Root      *ContentNode // top-level root of the tree
 	text      string       // text parsed to create the template (or its parent)
-	// Parsing only; cleared after parse
-	funcs     []map[string]interface{}
 	lex       *lexer
-	token     [3]item // three-token lookahead for parser
+	token     [3]item      // three-token lookahead for parser
 	peekCount int
-	vars      []string // variables defined at the moment
+	vars      []string     // variables defined at the moment
 	treeSet   map[string]*Tree
 }
 
@@ -95,7 +93,8 @@ func (t *Tree) backup2(t1 item) {
 
 // backup3 backs the input stream up three tokens
 // The zeroth token is already there.
-func (t *Tree) backup3(t2, t1 item) { // Reverse order: we're pushing back.
+func (t *Tree) backup3(t2, t1 item) {
+	// Reverse order: we're pushing back.
 	t.token[1] = t1
 	t.token[2] = t2
 	t.peekCount = 3
@@ -104,7 +103,7 @@ func (t *Tree) backup3(t2, t1 item) { // Reverse order: we're pushing back.
 // peek returns but does not consume the next token.
 func (t *Tree) peek() item {
 	if t.peekCount > 0 {
-		return t.token[t.peekCount-1]
+		return t.token[t.peekCount - 1]
 	}
 	t.peekCount = 1
 	t.token[0] = t.lex.nextItem()
@@ -140,10 +139,9 @@ func (t *Tree) peekNonSpace() (token item) {
 // Parsing.
 
 // New allocates a new parse tree with the given name.
-func New(name string, funcs ...map[string]interface{}) *Tree {
+func New(name string) *Tree {
 	return &Tree{
-		Name:  name,
-		funcs: funcs,
+		Name: name,
 	}
 }
 
@@ -230,7 +228,6 @@ func (t *Tree) startParse(funcs []map[string]interface{}, lex *lexer, treeSet ma
 	t.Root = nil
 	t.lex = lex
 	t.vars = []string{"$"}
-	t.funcs = funcs
 	t.treeSet = treeSet
 }
 
@@ -238,7 +235,6 @@ func (t *Tree) startParse(funcs []map[string]interface{}, lex *lexer, treeSet ma
 func (t *Tree) stopParse() {
 	t.lex = nil
 	t.vars = nil
-	t.funcs = nil
 	t.treeSet = nil
 }
 
@@ -343,7 +339,7 @@ func (t *Tree) parseDefinition() {
 
 // itemContent:
 //	textOrDirective*
-// Terminates at {{end}} or {{else}}, returned separately.
+// Terminates at </#.
 func (t *Tree) itemContent() (content *ContentNode, next Node) {
 	content = t.newContent(t.peekNonSpace().pos)
 
@@ -353,6 +349,7 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 		case nodeEnd, nodeElse:
 			return content, n
 		}
+
 		content.append(n)
 	}
 
@@ -367,8 +364,10 @@ func (t *Tree) textOrDirective() Node {
 	switch token := t.nextNonSpace(); token.typ {
 	case itemText:
 		return t.newText(token.pos, token.val)
-	case itemLeftDirective:
+	case itemStartDirective:
 		return t.directive()
+	case itemEndDirective:
+		return t.newEnd(token.pos, token.val)
 	default:
 		t.unexpected(token, "input")
 	}
@@ -391,29 +390,29 @@ func (t *Tree) directive() (n Node) {
 	t.backup()
 	token := t.peek()
 
-	_ = token
+	fmt.Println("directive", token)
 
 	return nil
 }
 
 // Expression:
-//	declarations? command ('|' command)*
-func (t *Tree) pipeline(context string) (expr *ExpressionNode) {
+//	node+
+func (t *Tree) expression(context string) (expr *ExpressionNode) {
 	token := t.peekNonSpace()
 	pos := token.pos
 
 	expr = t.newExpression(pos)
 	for {
 		switch token := t.nextNonSpace(); token.typ {
-		case itemRightDirective, itemRightParen:
-			if token.typ == itemRightParen {
-				t.backup()
-			}
+		case itemRightParen:
+			t.backup()
+			return
+		case itemCloseDirective:
 			return
 		case itemBool, itemCharConstant, itemStringConstant, itemIdentifier,
 			itemNumber, itemLeftParen:
 			t.backup()
-			expr.append(t.command())
+			expr.append(t.exprNode())
 		default:
 			t.unexpected(token, context)
 		}
@@ -423,12 +422,14 @@ func (t *Tree) pipeline(context string) (expr *ExpressionNode) {
 func (t *Tree) parseControl(allowElseIf bool, context string) (pos Pos, expr *ExpressionNode, list, elseList *ContentNode) {
 	defer t.popVars(len(t.vars))
 
-	pipe := t.pipeline(context)
+	expr = t.expression(context)
 	var next Node
 	list, next = t.itemContent()
 
+	fmt.Println(expr.String())
+
 	switch next.Type() {
-	case nodeEnd: //done
+	case nodeEnd: // done
 	case nodeElse:
 		if allowElseIf {
 			// Special case for "else if". If the "else" is followed immediately by an "if",
@@ -453,7 +454,7 @@ func (t *Tree) parseControl(allowElseIf bool, context string) (pos Pos, expr *Ex
 		}
 	}
 
-	return pipe.Position(), pipe, list, elseList
+	return expr.Position(), expr, list, elseList
 }
 
 // If:
@@ -471,13 +472,6 @@ func (t *Tree) listControl() Node {
 	return t.newList(t.parseControl(false, "list"))
 }
 
-// End:
-//	{{end}}
-// End keyword is past.
-func (t *Tree) endControl() Node {
-	return t.newEnd(t.expect(itemRightDirective, "end").pos)
-}
-
 // Else:
 //	{{else}}
 // Else keyword is past.
@@ -488,7 +482,7 @@ func (t *Tree) elseControl() Node {
 		// We see "{{else if ... " but in effect rewrite it to {{else}}{{if ... ".
 		return t.newElse(peek.pos)
 	}
-	token := t.expect(itemRightDirective, "else")
+	token := t.expect(itemCloseDirective, "else")
 	return t.newElse(token.pos)
 }
 
@@ -506,136 +500,71 @@ func (t *Tree) parseTemplateName(token item, context string) (name string) {
 	return
 }
 
-// command:
-//	operand (space operand)*
-// space-separated arguments up to a pipeline character or right delimiter.
-// we consume the pipe character but leave the right delim to terminate the action.
-func (t *Tree) command() *ExpressionNode {
-	cmd := t.newExpression(t.peekNonSpace().pos)
+// exprNode:
+//	literal (number, string, nil, boolean)
+//	identifier
+//	(expression)
+// A nil return means the next item is not a expression node.
+func (t *Tree) exprNode() *ExpressionNode {
+	ret := t.newExpression(t.peekNonSpace().pos)
+
 	for {
-		t.peekNonSpace() // skip leading spaces.
-		operand := t.operand()
-		if operand != nil {
-			cmd.append(operand)
+		var node Node
+
+		switch token := t.nextNonSpace(); token.typ {
+		case itemError:
+			t.errorf("%s", token.val)
+		case itemIdentifier:
+			node = NewIdentifier(token.val).SetTree(t).SetPos(token.pos)
+		case itemEq:
+			node =
+		case itemBool:
+			node = t.newBool(token.pos, token.val == "true")
+		case itemCharConstant, itemNumber:
+			number, err := t.newNumber(token.pos, token.val, token.typ)
+			if err != nil {
+				t.error(err)
+			}
+
+			node = number
+		case itemLeftParen:
+			expr := t.expression("parenthesized expression")
+			if token := t.next(); token.typ != itemRightParen {
+				t.errorf("unclosed right paren: unexpected %s", token)
+			}
+			node = expr
+		case itemStringConstant:
+			s, err := strconv.Unquote(token.val)
+			if err != nil {
+				t.error(err)
+			}
+
+			node = t.newString(token.pos, token.val, s)
 		}
 
-		switch token := t.next(); token.typ {
+		if nil != node {
+			ret.append(node)
+		}
+
+		switch  token := t.next(); token.typ {
 		case itemSpace:
 			continue
 		case itemError:
 			t.errorf("%s", token.val)
-		case itemRightDirective, itemRightParen:
+		case itemCloseDirective, itemRightParen:
 			t.backup()
-			//		case itemPipe:
 		default:
 			t.errorf("unexpected %s in operand", token)
 		}
+
 		break
 	}
-	if len(cmd.Nodes) == 0 {
-		t.errorf("empty command")
-	}
-	return cmd
-}
 
-// operand:
-//	term .Field*
-// An operand is a space-separated component of a command,
-// a term possibly followed by field accesses.
-// A nil return means the next item is not an operand.
-func (t *Tree) operand() Node {
-	node := t.term()
-	if node == nil {
-		return nil
+	if len(ret.Nodes) == 0 {
+		t.errorf("empty expression")
 	}
 
-	if t.peek().typ == itemExpression {
-		chain := t.newChain(t.peek().pos, node)
-		for t.peek().typ == itemExpression {
-			chain.Add(t.next().val)
-		}
-		// Compatibility with original API: If the term is of type NodeField
-		// or NodeVariable, just put more fields on the original.
-		// Otherwise, keep the Chain node.
-		// Obvious parsing errors involving literal values are detected here.
-		// More complex error cases will have to be handled at execution time.
-		switch node.Type() {
-		//		case NodeField:
-		//			node = t.newField(chain.Position(), chain.String())
-		case NodeVariable:
-			node = t.newVariable(chain.Position(), chain.String())
-		case NodeBool, NodeString, NodeNumber, NodeNil:
-			t.errorf("unexpected . after term %q", node.String())
-		default:
-			node = chain
-		}
-	}
-
-	return node
-}
-
-// term:
-//	literal (number, string, nil, boolean)
-//	function (identifier)
-//	.
-//	.Field
-//	$
-//	'(' pipeline ')'
-// A term is a simple "expression".
-// A nil return means the next item is not a term.
-func (t *Tree) term() Node {
-	switch token := t.nextNonSpace(); token.typ {
-	case itemError:
-		t.errorf("%s", token.val)
-	case itemIdentifier:
-		if !t.hasFunction(token.val) {
-			t.errorf("function %q not defined", token.val)
-		}
-
-		return NewIdentifier(token.val).SetTree(t).SetPos(token.pos)
-	case itemExpression:
-		return t.useVar(token.pos, token.val)
-		//	case itemField:
-		//		return t.newField(token.pos, token.val)
-	case itemBool:
-		return t.newBool(token.pos, token.val == "true")
-	case itemCharConstant, itemNumber:
-		number, err := t.newNumber(token.pos, token.val, token.typ)
-		if err != nil {
-			t.error(err)
-		}
-
-		return number
-	case itemLeftParen:
-		pipe := t.pipeline("parenthesized pipeline")
-		if token := t.next(); token.typ != itemRightParen {
-			t.errorf("unclosed right paren: unexpected %s", token)
-		}
-		return pipe
-	case itemStringConstant:
-		s, err := strconv.Unquote(token.val)
-		if err != nil {
-			t.error(err)
-		}
-
-		return t.newString(token.pos, token.val, s)
-	}
-	t.backup()
-	return nil
-}
-
-// hasFunction reports if a function name exists in the Tree's maps.
-func (t *Tree) hasFunction(name string) bool {
-	for _, funcMap := range t.funcs {
-		if funcMap == nil {
-			continue
-		}
-		if funcMap[name] != nil {
-			return true
-		}
-	}
-
-	return false
+	return ret
 }
 
 // popVars trims the variable list to the specified length

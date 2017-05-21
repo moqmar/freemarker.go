@@ -83,7 +83,7 @@ type ContentNode struct {
 }
 
 func (t *Tree) newContent(pos Pos) *ContentNode {
-	return &ContentNode{tr: t, NodeType: NodeList, Pos: pos}
+	return &ContentNode{tr: t, NodeType: NodeContent, Pos: pos}
 }
 
 func (c *ContentNode) append(n Node) {
@@ -530,20 +530,21 @@ func (s *StringNode) Copy() Node {
 	return s.tr.newString(s.Pos, s.Quoted, s.Text)
 }
 
-// endNode represents an {{end}} action.
+// endNode represents an </# directive.
 // It does not appear in the final parse tree.
 type endNode struct {
 	NodeType
 	Pos
-	tr *Tree
+	tr         *Tree
+	identifier string
 }
 
-func (t *Tree) newEnd(pos Pos) *endNode {
-	return &endNode{tr: t, NodeType: nodeEnd, Pos: pos}
+func (t *Tree) newEnd(pos Pos, iden string) *endNode {
+	return &endNode{tr: t, NodeType: nodeEnd, Pos: pos, identifier: iden}
 }
 
 func (e *endNode) String() string {
-	return "{{end}}"
+	return "</#" + e.identifier + ">"
 }
 
 func (e *endNode) tree() *Tree {
@@ -551,7 +552,7 @@ func (e *endNode) tree() *Tree {
 }
 
 func (e *endNode) Copy() Node {
-	return e.tr.newEnd(e.Pos)
+	return e.tr.newEnd(e.Pos, e.identifier)
 }
 
 // elseNode represents an {{else}} action. Does not appear in the final tree.

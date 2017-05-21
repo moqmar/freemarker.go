@@ -46,16 +46,49 @@ func (i item) String() string {
 	case len(i.val) > 10:
 		return fmt.Sprintf("%.10q...", i.val)
 	}
+
 	return fmt.Sprintf("%q", i.val)
 }
 
 // itemType identifies the type of lex items.
 type itemType int
 
+// Make the types pretty print.
+var itemName = map[itemType]string{
+	itemError:      "error",
+	itemBool:       "bool",
+	itemEOF:        "EOF",
+	itemIdentifier: "identifier",
+	itemEq:         "==",
+	itemNeq:        "!=",
+
+	itemCharConstant:   "char",
+	itemStringConstant: "string",
+	itemNumber:         "number",
+	itemLeftParen:      "(",
+	itemRightParen:     ")",
+	itemSpace:          "space",
+	itemText:           "text",
+
+	// directives
+	itemDirectiveIf:     "if",
+	itemDirectiveElseif: "elseif",
+	itemDirectiveElse:   "else",
+	itemDirectiveList:   "list",
+}
+
+func (i itemType) String() string {
+	s := itemName[i]
+	if s == "" {
+		return fmt.Sprintf("item%d", int(i))
+	}
+
+	return s
+}
+
 const (
 	itemError          itemType = iota // error occurred; value is text of error
 	itemBool                           // boolean constant
-	itemExpression                     // ${expression}
 	itemEOF                            // EOF
 	itemIdentifier                     // alphanumeric identifier
 	itemText                           // plain text
@@ -68,8 +101,9 @@ const (
 
 	itemLeftInterpolation  // ${
 	itemRightInterpolation // }
-	itemLeftDirective      // <#
-	itemRightDirective     // >
+	itemStartDirective     // <#
+	itemCloseDirective     // >
+	itemEndDirective       // </#
 	itemLeftParen          // (
 	itemRightParen         // )
 
@@ -226,19 +260,18 @@ func (l *lexer) run() {
 }
 
 const (
-	leftInterpolation    = "${"
-	rightInterpolation   = "}"
-	leftComment          = "<#--"
-	rightComment         = "-->"
-	leftDirectiveMacro   = "<#macro"
-	leftDirectiveInclude = "<#include"
-	leftDirective        = "<#"
-	rightDirective       = ">"
+	leftInterpolation  = "${"
+	rightInterpolation = "}"
+	leftComment        = "<#--"
+	rightComment       = "-->"
+	startDirective     = "<#"
+	endDirective       = "</#"
+	closeDirective     = ">"
 )
 
 // State functions.
 
-// lexText scans until an opening interpolation "${", comment "<#--" or directive "<#".
+// lexText scans until an opening interpolation "${", comment "<#--", directive "<#" or "</#".
 func lexText(l *lexer) stateFn {
 	l.width = 0
 
@@ -260,7 +293,16 @@ func lexText(l *lexer) stateFn {
 		return lexComment
 	}
 
-	if x := strings.Index(l.input[l.pos:], leftDirective); x >= 0 {
+	if x := strings.Index(l.input[l.pos:], startDirective); x >= 0 {
+		l.pos += Pos(x)
+		if l.pos > l.start {
+			l.emit(itemText)
+		}
+
+		return lexDirective
+	}
+
+	if x := strings.Index(l.input[l.pos:], endDirective); x >= 0 {
 		l.pos += Pos(x)
 		if l.pos > l.start {
 			l.emit(itemText)
@@ -324,9 +366,14 @@ func lexComment(l *lexer) stateFn {
 
 // lexDirective scans the directive inside FTL tags.
 func lexDirective(l *lexer) stateFn {
-	if strings.HasPrefix(l.input[l.pos:], leftDirective) {
-		l.pos += Pos(len(leftDirective))
-		l.emit(itemLeftDirective)
+	if strings.HasPrefix(l.input[l.pos:], startDirective) {
+		l.pos += Pos(len(startDirective))
+		l.emit(itemStartDirective)
+	}
+
+	if strings.HasPrefix(l.input[l.pos:], endDirective) {
+		l.pos += Pos(len(endDirective))
+		l.emit(itemEndDirective)
 	}
 
 	r := l.next()
@@ -361,11 +408,12 @@ func lexDirective(l *lexer) stateFn {
 		if l.parenDepth < 0 {
 			return l.errorf("unexpected right paren %#U", r)
 		}
-	//	case r <= unicode.MaxASCII && unicode.IsPrint(r):
-	//				l.emit(itemChar)
-	//		return lexDirective
+	//case r <= unicode.MaxASCII && unicode.IsPrint(r):
+	//	l.emit(itemCharConstant)
+	//
+	//	return lexDirective
 	case r == '>':
-		l.emit(itemRightDirective)
+		l.emit(itemCloseDirective)
 
 		return lexText
 	case r == '}':
@@ -397,7 +445,7 @@ Loop:
 	for {
 		switch r := l.next(); {
 		case isAlphaNumeric(r):
-			// absorb.
+		// absorb.
 		default:
 			l.backup()
 			word := l.input[l.start:l.pos]
@@ -424,7 +472,8 @@ Loop:
 // lexVariable scans a Variable: $Alphanumeric.
 // The $ has been scanned.
 func lexVariable(l *lexer) stateFn {
-	if l.atTerminator() { // Nothing interesting follows -> "$".
+	if l.atTerminator() {
+		// Nothing interesting follows -> "$".
 		//		l.emit(itemVariable)
 		return lexDirective
 	}
