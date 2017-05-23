@@ -209,19 +209,3 @@ func TestPos(t *testing.T) {
 		}
 	}
 }
-
-// TODO D, Test that an error shuts down the lexing goroutine.
-//func TestShutdown(t *testing.T) {
-//	// We need to duplicate template.Parse here to hold on to the lexer.
-//	const text = "erroneous{{define}}{{else}}1234"
-//	lexer := lex("foo", text)
-//	_, err := New("root").parseLexer(lexer, text)
-//	if err == nil {
-//		t.Fatalf("expected error")
-//	}
-//	// The error should have drained the input. Therefore, the lexer should be shut down.
-//	token, ok := <-lexer.items
-//	if ok {
-//		t.Fatalf("input was not drained; got %v", token)
-//	}
-//}

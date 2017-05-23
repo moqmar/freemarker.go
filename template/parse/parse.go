@@ -35,9 +35,8 @@ type Tree struct {
 	Root      *ContentNode // top-level root of the tree
 	text      string       // text parsed to create the template (or its parent)
 	lex       *lexer
-	token     [3]item      // three-token lookahead for parser
+	token     [3]item // three-token lookahead for parser
 	peekCount int
-	vars      []string     // variables defined at the moment
 	treeSet   map[string]*Tree
 }
 
@@ -103,7 +102,7 @@ func (t *Tree) backup3(t2, t1 item) {
 // peek returns but does not consume the next token.
 func (t *Tree) peek() item {
 	if t.peekCount > 0 {
-		return t.token[t.peekCount - 1]
+		return t.token[t.peekCount-1]
 	}
 	t.peekCount = 1
 	t.token[0] = t.lex.nextItem()
@@ -227,14 +226,12 @@ func (t *Tree) recover(errp *error) {
 func (t *Tree) startParse(funcs []map[string]interface{}, lex *lexer, treeSet map[string]*Tree) {
 	t.Root = nil
 	t.lex = lex
-	t.vars = []string{"$"}
 	t.treeSet = treeSet
 }
 
 // stopParse terminates parsing.
 func (t *Tree) stopParse() {
 	t.lex = nil
-	t.vars = nil
 	t.treeSet = nil
 }
 
@@ -399,9 +396,12 @@ func (t *Tree) directive() (n Node) {
 //	node+
 func (t *Tree) expression(context string) (expr *ExpressionNode) {
 	token := t.peekNonSpace()
-	pos := token.pos
 
-	expr = t.newExpression(pos)
+	expr = t.newExpression(token.pos)
+
+	operatorStack := &stack{}
+	operandStack := &stack{}
+
 	for {
 		switch token := t.nextNonSpace(); token.typ {
 		case itemRightParen:
@@ -411,8 +411,17 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 			return
 		case itemBool, itemCharConstant, itemStringConstant, itemIdentifier,
 			itemNumber, itemLeftParen:
-			t.backup()
-			expr.append(t.exprNode())
+
+			operandStack.push(&token)
+		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq:
+			top := operatorStack.peek()
+
+			if nil != top && token.precedence() < top.(item).precedence() {
+				operandStack.pop()
+				operandStack.pop()
+			} else {
+				operatorStack.push(&token)
+			}
 		default:
 			t.unexpected(token, context)
 		}
@@ -420,8 +429,6 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 }
 
 func (t *Tree) parseControl(allowElseIf bool, context string) (pos Pos, expr *ExpressionNode, list, elseList *ContentNode) {
-	defer t.popVars(len(t.vars))
-
 	expr = t.expression(context)
 	var next Node
 	list, next = t.itemContent()
@@ -500,102 +507,17 @@ func (t *Tree) parseTemplateName(token item, context string) (name string) {
 	return
 }
 
-// exprNode:
-//	literal (number, string, nil, boolean)
-//	identifier
-//	(expression)
-// A nil return means the next item is not a expression node.
-func (t *Tree) exprNode() *ExpressionNode {
-	ret := t.newExpression(t.peekNonSpace().pos)
-
-	for {
-		var node Node
-
-		switch token := t.nextNonSpace(); token.typ {
-		case itemError:
-			t.errorf("%s", token.val)
-		case itemIdentifier:
-			node = NewIdentifier(token.val).SetTree(t).SetPos(token.pos)
-		case itemEq:
-			//node =
-		case itemBool:
-			node = t.newBool(token.pos, token.val == "true")
-		case itemCharConstant, itemNumber:
-			number, err := t.newNumber(token.pos, token.val, token.typ)
-			if err != nil {
-				t.error(err)
-			}
-
-			node = number
-		case itemLeftParen:
-			expr := t.expression("parenthesized expression")
-			if token := t.next(); token.typ != itemRightParen {
-				t.errorf("unclosed right paren: unexpected %s", token)
-			}
-			node = expr
-		case itemStringConstant:
-			s, err := strconv.Unquote(token.val)
-			if err != nil {
-				t.error(err)
-			}
-
-			node = t.newString(token.pos, token.val, s)
-		}
-
-		if nil != node {
-			ret.append(node)
-		}
-
-		switch  token := t.next(); token.typ {
-		case itemSpace:
-			continue
-		case itemError:
-			t.errorf("%s", token.val)
-		case itemCloseDirective, itemRightParen:
-			t.backup()
-		default:
-			t.errorf("unexpected %s in operand", token)
-		}
-
-		break
-	}
-
-	if len(ret.Nodes) == 0 {
-		t.errorf("empty expression")
-	}
-
-	return ret
-}
-
-// popVars trims the variable list to the specified length
-func (t *Tree) popVars(n int) {
-	t.vars = t.vars[:n]
-}
-
-// useVar returns a node for a variable reference. It errors if the
-// variable is not defined.
-func (t *Tree) useVar(pos Pos, name string) Node {
-	v := t.newVariable(pos, name)
-	for _, varName := range t.vars {
-		if varName == v.Ident[0] {
-			return v
-		}
-	}
-	t.errorf("undefined variable %q", v.Ident[0])
-	return nil
-}
-
-type itemStack struct {
-	items []*item
+type stack struct {
+	items []interface{}
 	count int
 }
 
-func (s *itemStack) push(e *item) {
+func (s *stack) push(e interface{}) {
 	s.items = append(s.items[:s.count], e)
 	s.count++
 }
 
-func (s *itemStack) pop() *item {
+func (s *stack) pop() interface{} {
 	if s.count == 0 {
 		return nil
 	}
@@ -605,3 +527,10 @@ func (s *itemStack) pop() *item {
 	return s.items[s.count]
 }
 
+func (s *stack) peek() interface{} {
+	if s.count == 0 {
+		return nil
+	}
+
+	return s.items[s.count]
+}

@@ -22,168 +22,37 @@ import (
 	"testing"
 )
 
+func mkItem(typ itemType, text string) item {
+	return item{
+		typ: typ,
+		val: text,
+	}
+}
+
 func TestStack(t *testing.T) {
 	e1 := mkItem(itemNumber, "1")
 	e2 := mkItem(itemAdd, "+")
-	e3 := mkItem(itemAdd, "2")
+	e3 := mkItem(itemNumber, "2")
 
-	s := &itemStack{}
+	s := &stack{}
 	s.push(&e1)
 	s.push(&e2)
 	s.push(&e3)
 
-	if "2" != s.pop().val {
+	if "2" != s.pop().(*item).val {
 		t.Log("unexpected stack item")
 	}
 
-	if "+" != s.pop().val {
+	if "+" != s.pop().(*item).val {
 		t.Log("unexpected stack item")
 	}
 
-	if "1" != s.pop().val {
+	if "1" != s.pop().(*item).val {
 		t.Log("unexpected stack item")
 	}
 }
 
 var debug = flag.Bool("debug", true, "show the errors produced by the main tests")
-
-//type numberTest struct {
-//	text      string
-//	isInt     bool
-//	isUint    bool
-//	isFloat   bool
-//	isComplex bool
-//	int64
-//	uint64
-//	float64
-//	complex128
-//}
-
-//var numberTests = []numberTest{
-//	// basics
-//	{"0", true, true, true, false, 0, 0, 0, 0},
-//	{"-0", true, true, true, false, 0, 0, 0, 0}, // check that -0 is a uint.
-//	{"73", true, true, true, false, 73, 73, 73, 0},
-//	{"073", true, true, true, false, 073, 073, 073, 0},
-//	{"0x73", true, true, true, false, 0x73, 0x73, 0x73, 0},
-//	{"-73", true, false, true, false, -73, 0, -73, 0},
-//	{"+73", true, false, true, false, 73, 0, 73, 0},
-//	{"100", true, true, true, false, 100, 100, 100, 0},
-//	{"1e9", true, true, true, false, 1e9, 1e9, 1e9, 0},
-//	{"-1e9", true, false, true, false, -1e9, 0, -1e9, 0},
-//	{"-1.2", false, false, true, false, 0, 0, -1.2, 0},
-//	{"1e19", false, true, true, false, 0, 1e19, 1e19, 0},
-//	{"-1e19", false, false, true, false, 0, 0, -1e19, 0},
-//	{"4i", false, false, false, true, 0, 0, 0, 4i},
-//	{"-1.2+4.2i", false, false, false, true, 0, 0, 0, -1.2 + 4.2i},
-//	{"073i", false, false, false, true, 0, 0, 0, 73i}, // not octal!
-//	// complex with 0 imaginary are float (and maybe integer)
-//	{"0i", true, true, true, true, 0, 0, 0, 0},
-//	{"-1.2+0i", false, false, true, true, 0, 0, -1.2, -1.2},
-//	{"-12+0i", true, false, true, true, -12, 0, -12, -12},
-//	{"13+0i", true, true, true, true, 13, 13, 13, 13},
-//	// funny bases
-//	{"0123", true, true, true, false, 0123, 0123, 0123, 0},
-//	{"-0x0", true, true, true, false, 0, 0, 0, 0},
-//	{"0xdeadbeef", true, true, true, false, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, 0},
-//	// character constants
-//	{`'a'`, true, true, true, false, 'a', 'a', 'a', 0},
-//	{`'\n'`, true, true, true, false, '\n', '\n', '\n', 0},
-//	{`'\\'`, true, true, true, false, '\\', '\\', '\\', 0},
-//	{`'\''`, true, true, true, false, '\'', '\'', '\'', 0},
-//	{`'\xFF'`, true, true, true, false, 0xFF, 0xFF, 0xFF, 0},
-//	{`'パ'`, true, true, true, false, 0x30d1, 0x30d1, 0x30d1, 0},
-//	{`'\u30d1'`, true, true, true, false, 0x30d1, 0x30d1, 0x30d1, 0},
-//	{`'\U000030d1'`, true, true, true, false, 0x30d1, 0x30d1, 0x30d1, 0},
-//	// some broken syntax
-//	{text: "+-2"},
-//	{text: "0x123."},
-//	{text: "1e."},
-//	{text: "0xi."},
-//	{text: "1+2."},
-//	{text: "'x"},
-//	{text: "'xx'"},
-//	{text: "'433937734937734969526500969526500'"}, // Integer too large - issue 10634.
-//	// Issue 8622 - 0xe parsed as floating point. Very embarrassing.
-//	{"0xef", true, true, true, false, 0xef, 0xef, 0xef, 0},
-//}
-
-//func TestNumberParse(t *testing.T) {
-//	for _, test := range numberTests {
-//		// If fmt.Sscan thinks it's complex, it's complex. We can't trust the output
-//		// because imaginary comes out as a number.
-//		var c complex128
-//		typ := itemNumber
-//		var tree *Tree
-//		if test.text[0] == '\'' {
-//			typ = itemCharConstant
-//		} else {
-//			_, err := fmt.Sscan(test.text, &c)
-//			if err == nil {
-//				typ = itemComplex
-//			}
-//		}
-//		n, err := tree.newNumber(0, test.text, typ)
-//		ok := test.isInt || test.isUint || test.isFloat || test.isComplex
-//		if ok && err != nil {
-//			t.Errorf("unexpected error for %q: %s", test.text, err)
-//			continue
-//		}
-//		if !ok && err == nil {
-//			t.Errorf("expected error for %q", test.text)
-//			continue
-//		}
-//		if !ok {
-//			if *debug {
-//				fmt.Printf("%s\n\t%s\n", test.text, err)
-//			}
-//			continue
-//		}
-//		if n.IsComplex != test.isComplex {
-//			t.Errorf("complex incorrect for %q; should be %t", test.text, test.isComplex)
-//		}
-//		if test.isInt {
-//			if !n.IsInt {
-//				t.Errorf("expected integer for %q", test.text)
-//			}
-//			if n.Int64 != test.int64 {
-//				t.Errorf("int64 for %q should be %d Is %d", test.text, test.int64, n.Int64)
-//			}
-//		} else if n.IsInt {
-//			t.Errorf("did not expect integer for %q", test.text)
-//		}
-//		if test.isUint {
-//			if !n.IsUint {
-//				t.Errorf("expected unsigned integer for %q", test.text)
-//			}
-//			if n.Uint64 != test.uint64 {
-//				t.Errorf("uint64 for %q should be %d Is %d", test.text, test.uint64, n.Uint64)
-//			}
-//		} else if n.IsUint {
-//			t.Errorf("did not expect unsigned integer for %q", test.text)
-//		}
-//		if test.isFloat {
-//			if !n.IsFloat {
-//				t.Errorf("expected float for %q", test.text)
-//			}
-//			if n.Float64 != test.float64 {
-//				t.Errorf("float64 for %q should be %g Is %g", test.text, test.float64, n.Float64)
-//			}
-//		} else if n.IsFloat {
-//			t.Errorf("did not expect float for %q", test.text)
-//		}
-//		if test.isComplex {
-//			if !n.IsComplex {
-//				t.Errorf("expected complex for %q", test.text)
-//			}
-//			if n.Complex128 != test.complex128 {
-//				t.Errorf("complex128 for %q should be %g Is %g", test.text, test.complex128, n.Complex128)
-//			}
-//		} else if n.IsComplex {
-//			t.Errorf("did not expect complex for %q", test.text)
-//		}
-//	}
-//}
 
 type parseTest struct {
 	name   string
@@ -208,122 +77,8 @@ var parseTests = []parseTest{
 		`"some text"`},
 	//	{"emptyDirective", "<#if></#if>", hasError,
 	//		``},
-	//	{"field", "{{.X}}", noError,
-	//		`{{.X}}`},
-	//	{"simple command", "{{printf}}", noError,
-	//		`{{printf}}`},
-	//	{"$ invocation", "{{$}}", noError,
-	//		"{{$}}"},
-	//	{"variable invocation", "{{with $x := 3}}{{$x 23}}{{end}}", noError,
-	//		"{{with $x := 3}}{{$x 23}}{{end}}"},
-	//	{"variable with fields", "{{$.I}}", noError,
-	//		"{{$.I}}"},
-	//	{"multi-word command", "{{printf `%d` 23}}", noError,
-	//		"{{printf `%d` 23}}"},
-	//	{"pipeline", "{{.X|.Y}}", noError,
-	//		`{{.X | .Y}}`},
-	//	{"pipeline with decl", "{{$x := .X|.Y}}", noError,
-	//		`{{$x := .X | .Y}}`},
-	//	{"nested pipeline", "{{.X (.Y .Z) (.A | .B .C) (.E)}}", noError,
-	//		`{{.X (.Y .Z) (.A | .B .C) (.E)}}`},
-	//	{"field applied to parentheses", "{{(.Y .Z).Field}}", noError,
-	//		`{{(.Y .Z).Field}}`},
-	//	{"simple if", "{{if .X}}hello{{end}}", noError,
-	//		`{{if .X}}"hello"{{end}}`},
-	{"simple if", "<#if a == b>true content</#if>following content", noError,
-		`{{if .X}}"true"{{else}}"false"{{end}}`},
-	//	{"if with else", "{{if .X}}true{{else}}false{{end}}", noError,
+	//	{"simple if", "<#if a == b>true content</#if>following content", noError,
 	//		`{{if .X}}"true"{{else}}"false"{{end}}`},
-	//	{"if with else if", "{{if .X}}true{{else if .Y}}false{{end}}", noError,
-	//		`{{if .X}}"true"{{else}}{{if .Y}}"false"{{end}}{{end}}`},
-	//	{"if else chain", "+{{if .X}}X{{else if .Y}}Y{{else if .Z}}Z{{end}}+", noError,
-	//		`"+"{{if .X}}"X"{{else}}{{if .Y}}"Y"{{else}}{{if .Z}}"Z"{{end}}{{end}}{{end}}"+"`},
-	//	{"simple range", "{{range .X}}hello{{end}}", noError,
-	//		`{{range .X}}"hello"{{end}}`},
-	//	{"chained field range", "{{range .X.Y.Z}}hello{{end}}", noError,
-	//		`{{range .X.Y.Z}}"hello"{{end}}`},
-	//	{"nested range", "{{range .X}}hello{{range .Y}}goodbye{{end}}{{end}}", noError,
-	//		`{{range .X}}"hello"{{range .Y}}"goodbye"{{end}}{{end}}`},
-	//	{"range with else", "{{range .X}}true{{else}}false{{end}}", noError,
-	//		`{{range .X}}"true"{{else}}"false"{{end}}`},
-	//	{"range over pipeline", "{{range .X|.M}}true{{else}}false{{end}}", noError,
-	//		`{{range .X | .M}}"true"{{else}}"false"{{end}}`},
-	//	{"range []int", "{{range .SI}}{{.}}{{end}}", noError,
-	//		`{{range .SI}}{{.}}{{end}}`},
-	//	{"range 1 var", "{{range $x := .SI}}{{.}}{{end}}", noError,
-	//		`{{range $x := .SI}}{{.}}{{end}}`},
-	//	{"range 2 vars", "{{range $x, $y := .SI}}{{.}}{{end}}", noError,
-	//		`{{range $x, $y := .SI}}{{.}}{{end}}`},
-	//	{"constants", "{{range .SI 1 -3.2i true false 'a' nil}}{{end}}", noError,
-	//		`{{range .SI 1 -3.2i true false 'a' nil}}{{end}}`},
-	//	{"template", "{{template `x`}}", noError,
-	//		`{{template "x"}}`},
-	//	{"template with arg", "{{template `x` .Y}}", noError,
-	//		`{{template "x" .Y}}`},
-	//	{"with", "{{with .X}}hello{{end}}", noError,
-	//		`{{with .X}}"hello"{{end}}`},
-	//	{"with with else", "{{with .X}}hello{{else}}goodbye{{end}}", noError,
-	//		`{{with .X}}"hello"{{else}}"goodbye"{{end}}`},
-	//	// Trimming spaces.
-	//	{"trim left", "x \r\n\t{{- 3}}", noError, `"x"{{3}}`},
-	//	{"trim right", "{{3 -}}\n\n\ty", noError, `{{3}}"y"`},
-	//	{"trim left and right", "x \r\n\t{{- 3 -}}\n\n\ty", noError, `"x"{{3}}"y"`},
-	//	{"comment trim left", "x \r\n\t{{- /* hi */}}", noError, `"x"`},
-	//	{"comment trim right", "{{/* hi */ -}}\n\n\ty", noError, `"y"`},
-	//	{"comment trim left and right", "x \r\n\t{{- /* */ -}}\n\n\ty", noError, `"x""y"`},
-	//	{"block definition", `{{block "foo" .}}hello{{end}}`, noError,
-	//		`{{template "foo" .}}`},
-	//	// Errors.
-	//	{"unclosed action", "hello{{range", hasError, ""},
-	//	{"unmatched end", "{{end}}", hasError, ""},
-	//	{"unmatched else", "{{else}}", hasError, ""},
-	//	{"unmatched else after if", "{{if .X}}hello{{end}}{{else}}", hasError, ""},
-	//	{"multiple else", "{{if .X}}1{{else}}2{{else}}3{{end}}", hasError, ""},
-	//	{"missing end", "hello{{range .x}}", hasError, ""},
-	//	{"missing end after else", "hello{{range .x}}{{else}}", hasError, ""},
-	//	{"undefined function", "hello{{undefined}}", hasError, ""},
-	//	{"undefined variable", "{{$x}}", hasError, ""},
-	//	{"variable undefined after end", "{{with $x := 4}}{{end}}{{$x}}", hasError, ""},
-	//	{"variable undefined in template", "{{template $v}}", hasError, ""},
-	//	{"declare with field", "{{with $x.Y := 4}}{{end}}", hasError, ""},
-	//	{"template with field ref", "{{template .X}}", hasError, ""},
-	//	{"template with var", "{{template $v}}", hasError, ""},
-	//	{"invalid punctuation", "{{printf 3, 4}}", hasError, ""},
-	//	{"multidecl outside range", "{{with $v, $u := 3}}{{end}}", hasError, ""},
-	//	{"too many decls in range", "{{range $u, $v, $w := 3}}{{end}}", hasError, ""},
-	//	{"dot applied to parentheses", "{{printf (printf .).}}", hasError, ""},
-	//	{"adjacent args", "{{printf 3`x`}}", hasError, ""},
-	//	{"adjacent args with .", "{{printf `x`.}}", hasError, ""},
-	//	{"extra end after if", "{{if .X}}a{{else if .Y}}b{{end}}{{end}}", hasError, ""},
-	//	// Equals (and other chars) do not assignments make (yet).
-	//	{"bug0a", "{{$x := 0}}{{$x}}", noError, "{{$x := 0}}{{$x}}"},
-	//	{"bug0b", "{{$x = 1}}{{$x}}", hasError, ""},
-	//	{"bug0c", "{{$x ! 2}}{{$x}}", hasError, ""},
-	//	{"bug0d", "{{$x % 3}}{{$x}}", hasError, ""},
-	//	// Check the parse fails for := rather than comma.
-	//	{"bug0e", "{{range $x := $y := 3}}{{end}}", hasError, ""},
-	//	// Another bug: variable read must ignore following punctuation.
-	//	{"bug1a", "{{$x:=.}}{{$x!2}}", hasError, ""},                     // ! is just illegal here.
-	//	{"bug1b", "{{$x:=.}}{{$x+2}}", hasError, ""},                     // $x+2 should not parse as ($x) (+2).
-	//	{"bug1c", "{{$x:=.}}{{$x +2}}", noError, "{{$x := .}}{{$x +2}}"}, // It's OK with a space.
-	//	// dot following a literal value
-	//	{"dot after integer", "{{1.E}}", hasError, ""},
-	//	{"dot after float", "{{0.1.E}}", hasError, ""},
-	//	{"dot after boolean", "{{true.E}}", hasError, ""},
-	//	{"dot after char", "{{'a'.any}}", hasError, ""},
-	//	{"dot after string", `{{"hello".guys}}`, hasError, ""},
-	//	{"dot after dot", "{{..E}}", hasError, ""},
-	//	{"dot after nil", "{{nil.E}}", hasError, ""},
-	//	// Wrong pipeline
-	//	{"wrong pipeline dot", "{{12|.}}", hasError, ""},
-	//	{"wrong pipeline number", "{{.|12|printf}}", hasError, ""},
-	//	{"wrong pipeline string", "{{.|printf|\"error\"}}", hasError, ""},
-	//	{"wrong pipeline char", "{{12|printf|'e'}}", hasError, ""},
-	//	{"wrong pipeline boolean", "{{.|true}}", hasError, ""},
-	//	{"wrong pipeline nil", "{{'c'|nil}}", hasError, ""},
-	//	{"empty pipeline", `{{printf "%d" ( ) }}`, hasError, ""},
-	//	// Missing pipeline in block
-	//	{"block definition", `{{block "foo"}}hello{{end}}`, hasError, ""},
 }
 
 var builtins = map[string]interface{}{

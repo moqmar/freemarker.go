@@ -49,6 +49,25 @@ func (i item) String() string {
 	return fmt.Sprintf("%q", i.val)
 }
 
+const (
+	LowestPrec  = 0 // non-operators
+	UnaryPrec   = 6
+	HighestPrec = 7
+)
+
+func (i item) precedence() int {
+	switch i.typ {
+	case itemEq, itemNeq, itemLess, itemLessEq:
+		return 3
+	case itemAdd, itemMinus:
+		return 4
+	case itemMultiply, itemDivide:
+		return 5
+	}
+
+	return LowestPrec
+}
+
 // itemType identifies the type of lex items.
 type itemType int
 
@@ -64,6 +83,8 @@ var itemName = map[itemType]string{
 	itemMinus:          "-",
 	itemMultiply:       "*",
 	itemDivide:         "/",
+	itemLess:           "<",
+	itemLessEq:         "<=",
 	itemCharConstant:   "char",
 	itemStringConstant: "string",
 	itemNumber:         "number",
@@ -99,6 +120,8 @@ const (
 	itemMinus                          // -
 	itemMultiply                       // *
 	itemDivide                         // /
+	itemLess                           // <
+	itemLessEq                         // <=
 	itemCharConstant                   // character constant
 	itemStringConstant                 // string constant
 	itemSpace                          // run of spaces separating arguments
