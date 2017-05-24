@@ -57,6 +57,8 @@ const (
 
 func (i item) precedence() int {
 	switch i.typ {
+	case itemLowestPrecOpt:
+		return LowestPrec
 	case itemEq, itemNeq, itemLess, itemLessEq:
 		return 3
 	case itemAdd, itemMinus:
@@ -116,17 +118,19 @@ const (
 	itemIdentifier                     // alphanumeric identifier
 	itemText                           // plain text
 	itemNumber                         // simple number, including imaginary
-	itemAdd                            // +
-	itemMinus                          // -
-	itemMultiply                       // *
-	itemDivide                         // /
-	itemLess                           // <
-	itemLessEq                         // <=
 	itemCharConstant                   // character constant
 	itemStringConstant                 // string constant
 	itemSpace                          // run of spaces separating arguments
-	itemEq                             // ==
-	itemNeq                            // !=
+
+	itemAdd           // +
+	itemMinus         // -
+	itemMultiply      // *
+	itemDivide        // /
+	itemLess          // <
+	itemLessEq        // <=
+	itemEq            // ==
+	itemNeq           // !=
+	itemLowestPrecOpt // "#"
 
 	itemLeftInterpolation  // ${
 	itemRightInterpolation // }

@@ -202,24 +202,8 @@ type IdentifierNode struct {
 	Ident string // The identifier's name.
 }
 
-// NewIdentifier returns a new IdentifierNode with the given identifier name.
-func NewIdentifier(ident string) *IdentifierNode {
-	return &IdentifierNode{NodeType: NodeIdentifier, Ident: ident}
-}
-
-// SetPos sets the position. NewIdentifier is a public method so we can't modify its signature.
-// Chained for convenience.
-// TODO: fix one day?
-func (i *IdentifierNode) SetPos(pos Pos) *IdentifierNode {
-	i.Pos = pos
-	return i
-}
-
-// SetTree sets the parent tree for the node. NewIdentifier is a public method so we can't modify its signature.
-// Chained for convenience.
-func (i *IdentifierNode) SetTree(t *Tree) *IdentifierNode {
-	i.tr = t
-	return i
+func (t *Tree) newIdentifier(pos Pos, ident string) *IdentifierNode {
+	return &IdentifierNode{tr: t, NodeType: NodeIdentifier, Pos: pos, Ident: ident}
 }
 
 func (i *IdentifierNode) String() string {
@@ -231,7 +215,7 @@ func (i *IdentifierNode) tree() *Tree {
 }
 
 func (i *IdentifierNode) Copy() Node {
-	return NewIdentifier(i.Ident).SetTree(i.tr).SetPos(i.Pos)
+	return &IdentifierNode{tr: i.tr, NodeType: i.NodeType, Pos: i.Pos, Ident: i.Ident}
 }
 
 // VariableNode holds a list of variable names, possibly with chained field
@@ -505,21 +489,20 @@ func (n *NumberNode) Copy() Node {
 	return nn
 }
 
-// StringNode holds a string constant. The value has been "unquoted".
+// StringNode holds a string constant.
 type StringNode struct {
 	NodeType
 	Pos
-	tr     *Tree
-	Quoted string // The original text of the string, with quotes.
-	Text   string // The string, after quote processing.
+	tr   *Tree
+	Text string // The string, after quote processing.
 }
 
-func (t *Tree) newString(pos Pos, orig, text string) *StringNode {
-	return &StringNode{tr: t, NodeType: NodeString, Pos: pos, Quoted: orig, Text: text}
+func (t *Tree) newString(pos Pos, text string) *StringNode {
+	return &StringNode{tr: t, NodeType: NodeString, Pos: pos, Text: text}
 }
 
 func (s *StringNode) String() string {
-	return s.Quoted
+	return s.Text
 }
 
 func (s *StringNode) tree() *Tree {
@@ -527,7 +510,7 @@ func (s *StringNode) tree() *Tree {
 }
 
 func (s *StringNode) Copy() Node {
-	return s.tr.newString(s.Pos, s.Quoted, s.Text)
+	return s.tr.newString(s.Pos, s.Text)
 }
 
 // endNode represents an </# directive.

@@ -334,9 +334,6 @@ func (t *Tree) parseDefinition() {
 	t.stopParse()
 }
 
-// itemContent:
-//	textOrDirective*
-// Terminates at </#.
 func (t *Tree) itemContent() (content *ContentNode, next Node) {
 	content = t.newContent(t.peekNonSpace().pos)
 
@@ -355,8 +352,6 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 	return
 }
 
-// textOrDirective:
-//	text | directive
 func (t *Tree) textOrDirective() Node {
 	switch token := t.nextNonSpace(); token.typ {
 	case itemText:
@@ -372,10 +367,6 @@ func (t *Tree) textOrDirective() Node {
 	return nil
 }
 
-// Directive:
-//	control
-// Left delim "<#" is past. Now get directives.
-// First word could be a keyword such as if.
 func (t *Tree) directive() (n Node) {
 	switch token := t.nextNonSpace(); token.typ {
 	case itemDirectiveIf:
@@ -392,36 +383,53 @@ func (t *Tree) directive() (n Node) {
 	return nil
 }
 
-// Expression:
-//	node+
 func (t *Tree) expression(context string) (expr *ExpressionNode) {
 	token := t.peekNonSpace()
 
 	expr = t.newExpression(token.pos)
 
 	operatorStack := &stack{}
+	lowestPrecOperator := mkItem(itemLowestPrecOpt, "#")
+	operatorStack.push(&lowestPrecOperator)
+
 	operandStack := &stack{}
 
 	for {
 		switch token := t.nextNonSpace(); token.typ {
-		case itemRightParen:
-			t.backup()
-			return
 		case itemCloseDirective:
 			return
-		case itemBool, itemCharConstant, itemStringConstant, itemIdentifier,
-			itemNumber, itemLeftParen:
-
-			operandStack.push(&token)
-		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq:
-			top := operatorStack.peek()
-
-			if nil != top && token.precedence() < top.(item).precedence() {
-				operandStack.pop()
-				operandStack.pop()
-			} else {
-				operatorStack.push(&token)
+		case itemBool:
+			boolean := t.newBool(token.pos, token.val == "true")
+			operandStack.push(boolean)
+		case itemCharConstant, itemNumber:
+			number, err := t.newNumber(token.pos, token.val, token.typ)
+			if err != nil {
+				t.error(err)
 			}
+			operandStack.push(number)
+		case itemIdentifier:
+			iden := t.newIdentifier(token.pos, token.val)
+			operandStack.push(iden)
+		case itemStringConstant:
+			str := t.newString(token.pos, token.val)
+			operandStack.push(str)
+		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq:
+			topOperator := operatorStack.peek()
+			if lowestPrecOperator == topOperator {
+				operatorStack.push(&token)
+
+				continue
+			}
+
+			if token.precedence() > topOperator.(item).precedence() {
+				operatorStack.push(&token)
+
+				continue
+			}
+
+			operandStack.pop()
+			operandStack.pop()
+
 		default:
 			t.unexpected(token, context)
 		}
@@ -430,6 +438,7 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 
 func (t *Tree) parseControl(allowElseIf bool, context string) (pos Pos, expr *ExpressionNode, list, elseList *ContentNode) {
 	expr = t.expression(context)
+
 	var next Node
 	list, next = t.itemContent()
 
