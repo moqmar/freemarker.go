@@ -62,7 +62,7 @@ const (
 	NodeExpression                 // expression
 	nodeElse                       // else action. Not added to tree
 	nodeEnd                        // end action. Not added to tree
-	NodeIdentifier                 // identifier; always a function name
+	NodeIdentifier                 // identifier
 	NodeContent                    // list of Nodes
 	NodeNil                        // untyped nil constant
 	NodeNumber                     // numerical constant
@@ -148,12 +148,13 @@ func (t *TextNode) Copy() Node {
 type ExpressionNode struct {
 	NodeType
 	Pos
-	tr    *Tree
-	Nodes []Node
+	tr       *Tree
+	operator itemType
+	Nodes    []Node // almost two nodes in case of binary expression, such as "a+b"
 }
 
-func (t *Tree) newExpression(pos Pos) *ExpressionNode {
-	return &ExpressionNode{tr: t, NodeType: NodeExpression, Pos: pos}
+func (t *Tree) newExpression(pos Pos, optr itemType) *ExpressionNode {
+	return &ExpressionNode{tr: t, NodeType: NodeExpression, Pos: pos, operator: optr}
 }
 
 func (c *ExpressionNode) append(node Node) {
@@ -164,7 +165,7 @@ func (c *ExpressionNode) String() string {
 	s := ""
 	for i, node := range c.Nodes {
 		if i > 0 {
-			s += " "
+			s += c.operator.String()
 		}
 		if node, ok := node.(*ExpressionNode); ok {
 			s += "(" + node.String() + ")"
@@ -183,7 +184,7 @@ func (c *ExpressionNode) CopyExpr() *ExpressionNode {
 	if c == nil {
 		return c
 	}
-	n := c.tr.newExpression(c.Pos)
+	n := c.tr.newExpression(c.Pos, c.operator)
 	for _, c := range c.Nodes {
 		n.append(c.Copy())
 	}
@@ -580,12 +581,12 @@ func (t *Tree) newIf(pos Pos, expr *ExpressionNode, content, elseContent *Conten
 		Expr: expr, Content: content, ElseContent: elseContent}
 }
 
-func (t *IfNode) String() string {
-	return fmt.Sprintf("<#if %s>", t.Expr)
+func (ifNode *IfNode) String() string {
+	return fmt.Sprintf("<#if %s>%s</#if>", ifNode.Expr, ifNode.Content)
 }
 
-func (t *IfNode) tree() *Tree {
-	return t.tr
+func (ifNode *IfNode) tree() *Tree {
+	return ifNode.tr
 }
 
 func (i *IfNode) Copy() Node {

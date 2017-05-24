@@ -291,19 +291,6 @@ func (t *Tree) parse() {
 	t.Root = t.newContent(t.peek().pos)
 
 	for t.peek().typ != itemEOF {
-		//if t.peek().typ == itemLeftDirective {
-		//	delim := t.next()
-		//			if t.nextNonSpace().typ == itemDefine {
-		//				newT := New("definition") // name will be updated once we know it.
-		//				newT.text = t.text
-		//				newT.ParseName = t.ParseName
-		//				newT.startParse(t.funcs, t.lex, t.treeSet)
-		//				newT.parseDefinition()
-		//				continue
-		//			}
-		//	t.backup2(delim)
-		//}
-
 		switch n := t.textOrDirective(); n.Type() {
 		case nodeEnd, nodeElse:
 			t.errorf("unexpected %s", n)
@@ -339,6 +326,7 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 
 	for t.peekNonSpace().typ != itemEOF {
 		n := t.textOrDirective()
+
 		switch n.Type() {
 		case nodeEnd, nodeElse:
 			return content, n
@@ -353,12 +341,17 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 }
 
 func (t *Tree) textOrDirective() Node {
-	switch token := t.nextNonSpace(); token.typ {
+	token := t.nextNonSpace()
+
+	switch token.typ {
 	case itemText:
 		return t.newText(token.pos, token.val)
 	case itemStartDirective:
 		return t.directive()
 	case itemEndDirective:
+		token = t.next() // consumes an identifier, such as "if"
+		token = t.next() // consumes a close directive token ">"
+
 		return t.newEnd(token.pos, token.val)
 	default:
 		t.unexpected(token, "input")
@@ -383,11 +376,7 @@ func (t *Tree) directive() (n Node) {
 	return nil
 }
 
-func (t *Tree) expression(context string) (expr *ExpressionNode) {
-	token := t.peekNonSpace()
-
-	expr = t.newExpression(token.pos)
-
+func (t *Tree) expression(context string) *ExpressionNode {
 	operatorStack := &stack{}
 	lowestPrecOperator := mkItem(itemLowestPrecOpt, "#")
 	operatorStack.push(&lowestPrecOperator)
@@ -395,9 +384,21 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 	operandStack := &stack{}
 
 	for {
-		switch token := t.nextNonSpace(); token.typ {
+		token := t.nextNonSpace()
+
+		switch token.typ {
 		case itemCloseDirective:
-			return
+			topOperator := operatorStack.pop()
+			bottomOperator := operatorStack.pop()
+			if &lowestPrecOperator != bottomOperator.(*item) {
+				t.unexpected(token, context)
+			}
+
+			expr := t.newExpression(token.pos, topOperator.(*item).typ)
+			expr.append(operandStack.pop().(Node))
+			expr.append(operandStack.pop().(Node))
+
+			return expr
 		case itemBool:
 			boolean := t.newBool(token.pos, token.val == "true")
 			operandStack.push(boolean)
@@ -413,7 +414,7 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 		case itemStringConstant:
 			str := t.newString(token.pos, token.val)
 			operandStack.push(str)
-		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq:
+		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq, itemEq, itemNeq:
 			topOperator := operatorStack.peek()
 			if lowestPrecOperator == topOperator {
 				operatorStack.push(&token)
@@ -421,15 +422,18 @@ func (t *Tree) expression(context string) (expr *ExpressionNode) {
 				continue
 			}
 
-			if token.precedence() > topOperator.(item).precedence() {
+			if token.precedence() >= topOperator.(*item).precedence() {
 				operatorStack.push(&token)
 
 				continue
 			}
 
-			operandStack.pop()
-			operandStack.pop()
+			operExpr := t.newExpression(token.pos, topOperator.(*item).typ)
+			operExpr.append(operandStack.pop().(Node))
+			operExpr.append(operandStack.pop().(Node))
+			operandStack.push(operExpr)
 
+			t.backup()
 		default:
 			t.unexpected(token, context)
 		}
@@ -441,8 +445,6 @@ func (t *Tree) parseControl(allowElseIf bool, context string) (pos Pos, expr *Ex
 
 	var next Node
 	list, next = t.itemContent()
-
-	fmt.Println(expr.String())
 
 	switch next.Type() {
 	case nodeEnd: // done
@@ -541,5 +543,5 @@ func (s *stack) peek() interface{} {
 		return nil
 	}
 
-	return s.items[s.count]
+	return s.items[s.count-1]
 }

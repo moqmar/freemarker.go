@@ -47,6 +47,10 @@ func TestStack(t *testing.T) {
 		t.Log("unexpected stack item")
 	}
 
+	if "1" != s.peek().(*item).val {
+		t.Log("unexpected stack item")
+	}
+
 	if "1" != s.pop().(*item).val {
 		t.Log("unexpected stack item")
 	}
@@ -67,18 +71,18 @@ const (
 )
 
 var parseTests = []parseTest{
-	{"empty", "", noError,
-		``},
-	{"comment", "hello-<#--\n\n\n-->-world", noError,
-		`"hello-""-world"`},
-	{"spaces", " \t\n", noError,
-		`" \t\n"`},
-	{"text", "some text", noError,
-		`"some text"`},
+	//	{"empty", "", noError,
+	//		``},
+	//	{"comment", "hello-<#--\n\n\n-->-world", noError,
+	//		`"hello-""-world"`},
+	//	{"spaces", " \t\n", noError,
+	//		`" \t\n"`},
+	//	{"text", "some text", noError,
+	//		`"some text"`},
 	//	{"emptyDirective", "<#if></#if>", hasError,
 	//		``},
-	//	{"simple if", "<#if a == b>true content</#if>following content", noError,
-	//		`{{if .X}}"true"{{else}}"false"{{end}}`},
+	{"simple if", "<#if a == b>true content</#if>following content", noError,
+		`<#if b==a>"true content"</#if>"following content"`},
 }
 
 var builtins = map[string]interface{}{
@@ -120,11 +124,6 @@ func TestParse(t *testing.T) {
 	testParse(false, t)
 }
 
-//// Same as TestParse, but we copy the node first
-//func TestParseCopy(t *testing.T) {
-//	testParse(true, t)
-//}
-
 type isEmptyTest struct {
 	name  string
 	input string
@@ -132,13 +131,9 @@ type isEmptyTest struct {
 }
 
 var isEmptyTests = []isEmptyTest{
-	{"empty", ``, true},
-	{"nonempty", `hello`, false},
+	{"empty", "", true},
+	{"nonempty", "hello", false},
 	{"spaces only", " \t\n \t\n", true},
-	//	{"definition", `{{define "x"}}something{{end}}`, true},
-	//	{"definitions and space", "{{define `x`}}something{{end}}\n\n{{define `y`}}something{{end}}\n\n", true},
-	{"definitions and text", "{{define `x`}}something{{end}}\nx\n{{define `y`}}something{{end}}\ny\n", false},
-	{"definition and action", "{{define `x`}}something{{end}}{{if 3}}foo{{end}}", false},
 }
 
 func TestIsEmpty(t *testing.T) {
@@ -172,140 +167,3 @@ func TestErrorContextWithTreeCopy(t *testing.T) {
 		t.Errorf("wrong error location want %q got %q", wantContext, gotContext)
 	}
 }
-
-// All failures, and the result is a string that must appear in the error message.
-//var errorTests = []parseTest{
-//	// Check line numbers are accurate.
-//	{"unclosed1",
-//		"line1\n{{",
-//		hasError, `unclosed1:2: unexpected unclosed action in command`},
-//	{"unclosed2",
-//		"line1\n{{define `x`}}line2\n{{",
-//		hasError, `unclosed2:3: unexpected unclosed action in command`},
-//	// Specific errors.
-//	{"function",
-//		"{{foo}}",
-//		hasError, `function "foo" not defined`},
-//	{"comment",
-//		"{{/*}}",
-//		hasError, `unclosed comment`},
-//	{"lparen",
-//		"{{.X (1 2 3}}",
-//		hasError, `unclosed left paren`},
-//	{"rparen",
-//		"{{.X 1 2 3)}}",
-//		hasError, `unexpected ")"`},
-//	{"space",
-//		"{{`x`3}}",
-//		hasError, `in operand`},
-//	{"idchar",
-//		"{{a#}}",
-//		hasError, `'#'`},
-//	{"charconst",
-//		"{{'a}}",
-//		hasError, `unterminated character constant`},
-//	{"stringconst",
-//		`{{"a}}`,
-//		hasError, `unterminated quoted string`},
-//	{"rawstringconst",
-//		"{{`a}}",
-//		hasError, `unterminated raw quoted string`},
-//	{"number",
-//		"{{0xi}}",
-//		hasError, `number syntax`},
-//	{"multidefine",
-//		"{{define `a`}}a{{end}}{{define `a`}}b{{end}}",
-//		hasError, `multiple definition of template`},
-//	{"eof",
-//		"{{range .X}}",
-//		hasError, `unexpected EOF`},
-//	{"variable",
-//		// Declare $x so it's defined, to avoid that error, and then check we don't parse a declaration.
-//		"{{$x := 23}}{{with $x.y := 3}}{{$x 23}}{{end}}",
-//		hasError, `unexpected ":="`},
-//	{"multidecl",
-//		"{{$a,$b,$c := 23}}",
-//		hasError, `too many declarations`},
-//	{"undefvar",
-//		"{{$a}}",
-//		hasError, `undefined variable`},
-//	{"wrongdot",
-//		"{{true.any}}",
-//		hasError, `unexpected . after term`},
-//	{"wrongpipeline",
-//		"{{12|false}}",
-//		hasError, `non executable command in pipeline`},
-//	{"emptypipeline",
-//		`{{ ( ) }}`,
-//		hasError, `missing value for parenthesized pipeline`},
-//}
-
-//func TestErrors(t *testing.T) {
-//	for _, test := range errorTests {
-//		_, err := New(test.name).Parse(test.input, "", "", make(map[string]*Tree))
-//		if err == nil {
-//			t.Errorf("%q: expected error", test.name)
-//			continue
-//		}
-//		if !strings.Contains(err.Error(), test.result) {
-//			t.Errorf("%q: error %q does not contain %q", test.name, err, test.result)
-//		}
-//	}
-//}
-
-//func TestBlock(t *testing.T) {
-//	const (
-//		input = `a{{block "inner" .}}bar{{.}}baz{{end}}b`
-//		outer = `a{{template "inner" .}}b`
-//		inner = `bar{{.}}baz`
-//	)
-//	treeSet := make(map[string]*Tree)
-//	tmpl, err := New("outer").Parse(input, "", "", treeSet, nil)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	if g, w := tmpl.Root.String(), outer; g != w {
-//		t.Errorf("outer template = %q, want %q", g, w)
-//	}
-//	inTmpl := treeSet["inner"]
-//	if inTmpl == nil {
-//		t.Fatal("block did not define template")
-//	}
-//	if g, w := inTmpl.Root.String(), inner; g != w {
-//		t.Errorf("inner template = %q, want %q", g, w)
-//	}
-//}
-
-//func TestLineNum(t *testing.T) {
-//	const count = 100
-//	text := strings.Repeat("{{printf 1234}}\n", count)
-//	tree, err := New("bench").Parse(text, "", "", make(map[string]*Tree), builtins)
-//	if err != nil {
-//		t.Fatal(err)
-//	}
-//	// Check the line numbers. Each line is an action containing a template, followed by text.
-//	// That's two nodes per line.
-//	nodes := tree.Root.Nodes
-//	for i := 0; i < len(nodes); i += 2 {
-//		line := 1 + i/2
-//		// Action first.
-//		action := nodes[i].(*ActionNode)
-//		if action.Line != line {
-//			t.Fatalf("line %d: action is line %d", line, action.Line)
-//		}
-//		pipe := action.Pipe
-//		if pipe.Line != line {
-//			t.Fatalf("line %d: pipe is line %d", line, pipe.Line)
-//		}
-//	}
-//}
-
-//func BenchmarkParseLarge(b *testing.B) {
-//	text := strings.Repeat("{{1234}}\n", 10000)
-//	for i := 0; i < b.N; i++ {
-//		_, err := New("bench").Parse(text, "", "", make(map[string]*Tree), builtins)
-//		if err != nil {
-//			b.Fatal(err)
-//		}
-//	}
-//}

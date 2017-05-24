@@ -120,7 +120,7 @@ var lexTests = []lexTest{
 		tCloseDir,
 		tEOF,
 	}},
-	{"end if", "<#if true>true content</#if>", []item{
+	{"end if", "<#if true>true content</#if>following content", []item{
 		tStartDir,
 		tIf,
 		tSpace,
@@ -130,9 +130,9 @@ var lexTests = []lexTest{
 		tEndDir,
 		tIf,
 		tCloseDir,
+		mkItem(itemText, "following content"),
 		tEOF,
 	}},
-
 	{"text with bad comment", "hello<#--world", []item{
 		mkItem(itemText, "hello"),
 		mkItem(itemError, `unclosed comment`),
