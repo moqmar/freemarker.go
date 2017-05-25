@@ -58,11 +58,11 @@ func (t *Tree) Copy() *Tree {
 // templates described in the argument string. The top-level template will be
 // given the specified name. If an error is encountered, parsing stops and an
 // empty map is returned with the error.
-func Parse(name, text string, funcs ...map[string]interface{}) (map[string]*Tree, error) {
+func Parse(name, text string) (map[string]*Tree, error) {
 	treeSet := make(map[string]*Tree)
 	t := New(name)
 	t.text = text
-	_, err := t.Parse(text, treeSet, funcs...)
+	_, err := t.Parse(text, treeSet)
 
 	return treeSet, err
 }
@@ -223,7 +223,7 @@ func (t *Tree) recover(errp *error) {
 }
 
 // startParse initializes the parser, using the lexer.
-func (t *Tree) startParse(funcs []map[string]interface{}, lex *lexer, treeSet map[string]*Tree) {
+func (t *Tree) startParse(lex *lexer, treeSet map[string]*Tree) {
 	t.Root = nil
 	t.lex = lex
 	t.treeSet = treeSet
@@ -239,10 +239,10 @@ func (t *Tree) stopParse() {
 // the template for execution. If either action delimiter string is empty, the
 // default ("{{" or "}}") is used. Embedded template definitions are added to
 // the treeSet map.
-func (t *Tree) Parse(text string, treeSet map[string]*Tree, funcs ...map[string]interface{}) (tree *Tree, err error) {
+func (t *Tree) Parse(text string, treeSet map[string]*Tree) (tree *Tree, err error) {
 	defer t.recover(&err)
 	t.ParseName = t.Name
-	t.startParse(funcs, lex(t.Name, text), treeSet)
+	t.startParse(lex(t.Name, text), treeSet)
 	t.text = text
 	t.parse()
 	t.add()
@@ -390,6 +390,10 @@ func (t *Tree) expression(context string) *ExpressionNode {
 		case itemCloseDirective:
 			topOperator := operatorStack.pop()
 			bottomOperator := operatorStack.pop()
+			if nil == bottomOperator {
+				t.unexpected(token, context)
+			}
+
 			if &lowestPrecOperator != bottomOperator.(*item) {
 				t.unexpected(token, context)
 			}

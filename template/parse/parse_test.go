@@ -71,29 +71,20 @@ const (
 )
 
 var parseTests = []parseTest{
-	//	{"empty", "", noError,
-	//		``},
-	//	{"comment", "hello-<#--\n\n\n-->-world", noError,
-	//		`"hello-""-world"`},
-	//	{"spaces", " \t\n", noError,
-	//		`" \t\n"`},
-	//	{"text", "some text", noError,
-	//		`"some text"`},
-	//	{"emptyDirective", "<#if></#if>", hasError,
-	//		``},
+	{"empty", "", noError, ``},
+	{"comment", "hello-<#--\n\n\n-->-world", noError, `"hello-""-world"`},
+	{"spaces", " \t\n", noError, `" \t\n"`},
+	{"text", "some text", noError, `"some text"`},
+	{"emptyDirective", "<#if></#if>", hasError, ``},
 	{"simple if", "<#if a == b>true content</#if>following content", noError,
 		`<#if b==a>"true content"</#if>"following content"`},
-}
-
-var builtins = map[string]interface{}{
-	"printf": fmt.Sprintf,
 }
 
 func testParse(doCopy bool, t *testing.T) {
 	textFormat = "%q"
 	defer func() { textFormat = "%s" }()
 	for _, test := range parseTests {
-		tmpl, err := New(test.name).Parse(test.input, make(map[string]*Tree), builtins)
+		tmpl, err := New(test.name).Parse(test.input, make(map[string]*Tree))
 		switch {
 		case err == nil && !test.ok:
 			t.Errorf("%q: expected error; got none", test.name)
@@ -141,7 +132,7 @@ func TestIsEmpty(t *testing.T) {
 		t.Errorf("nil tree is not empty")
 	}
 	for _, test := range isEmptyTests {
-		tree, err := New("root").Parse(test.input, make(map[string]*Tree), nil)
+		tree, err := New("root").Parse(test.input, make(map[string]*Tree))
 		if err != nil {
 			t.Errorf("%q: unexpected error: %v", test.name, err)
 			continue
@@ -153,7 +144,7 @@ func TestIsEmpty(t *testing.T) {
 }
 
 func TestErrorContextWithTreeCopy(t *testing.T) {
-	tree, err := New("root").Parse("{{if true}}{{end}}", make(map[string]*Tree), nil)
+	tree, err := New("root").Parse("{{if true}}{{end}}", make(map[string]*Tree))
 	if err != nil {
 		t.Fatalf("unexpected tree parse failure: %v", err)
 	}

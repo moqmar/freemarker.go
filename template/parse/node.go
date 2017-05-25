@@ -150,7 +150,7 @@ type ExpressionNode struct {
 	Pos
 	tr       *Tree
 	operator itemType
-	Nodes    []Node // almost two nodes in case of binary expression, such as "a+b"
+	Nodes    []Node // two nodes at most, binary expression, such as "a+b"
 }
 
 func (t *Tree) newExpression(pos Pos, optr itemType) *ExpressionNode {
