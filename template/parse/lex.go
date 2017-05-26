@@ -366,16 +366,6 @@ func lexText(l *lexer) stateFn {
 	return nil
 }
 
-// rightTrimLength returns the length of the spaces at the end of the string.
-func rightTrimLength(s string) Pos {
-	return Pos(len(s) - len(strings.TrimRight(s, spaceChars)))
-}
-
-// atRightInterpolation reports whether the lexer is at a right interpolation "}".
-func (l *lexer) atRightInterpolation() bool {
-	return strings.HasPrefix(l.input[l.pos:], rightInterpolation)
-}
-
 // lexLeftInterpolation scans the left interpolation "${".
 func lexLeftInterpolation(l *lexer) stateFn {
 	l.pos += Pos(len(leftInterpolation))
