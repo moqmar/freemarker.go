@@ -40,19 +40,22 @@ var (
 	tStartDir = mkItem(itemStartDirective, "<#")
 	tCloseDir = mkItem(itemCloseDirective, ">")
 	tEndDir   = mkItem(itemEndDirective, "</#")
-
-	tLpar    = mkItem(itemLeftParen, "(")
-	tRpar    = mkItem(itemRightParen, ")")
-	tSpace   = mkItem(itemSpace, " ")
-	tInclude = mkItem(itemDirectiveInclude, "include")
-	tMacro   = mkItem(itemDirectiveMacro, "macro")
-	tIf      = mkItem(itemDirectiveIf, "if")
-	tElseif  = mkItem(itemDirectiveElseif, "ellseif")
-	tElse    = mkItem(itemDirectiveElse, "else")
-	tList    = mkItem(itemDirectiveList, "list")
-	tAs      = mkItem(itemAs, "as")
-	tEq      = mkItem(itemEq, "==")
-	tNeq     = mkItem(itemNeq, "!=")
+	tLpar     = mkItem(itemLeftParen, "(")
+	tRpar     = mkItem(itemRightParen, ")")
+	tSpace    = mkItem(itemSpace, " ")
+	tInclude  = mkItem(itemDirectiveInclude, "include")
+	tMacro    = mkItem(itemDirectiveMacro, "macro")
+	tIf       = mkItem(itemDirectiveIf, "if")
+	tElseif   = mkItem(itemDirectiveElseif, "ellseif")
+	tElse     = mkItem(itemDirectiveElse, "else")
+	tList     = mkItem(itemDirectiveList, "list")
+	tAs       = mkItem(itemAs, "as")
+	tEq       = mkItem(itemEq, "==")
+	tNeq      = mkItem(itemNeq, "!=")
+	tGt       = mkItem(itemGreater, "gt")
+	tGtEq     = mkItem(itemGreaterEq, "gte")
+	tLess     = mkItem(itemLess, "<")
+	tLessEq   = mkItem(itemLessEq, "<=")
 )
 
 var lexTests = []lexTest{
@@ -88,7 +91,7 @@ var lexTests = []lexTest{
 		mkItem(itemIdentifier, "animal"),
 		tCloseDir,
 		tEOF}},
-	{"char", `<#if 'a' != 'b'>`, []item{
+	{"if char neq", `<#if 'a' != 'b'>`, []item{
 		tStartDir,
 		tIf,
 		tSpace,
@@ -100,7 +103,7 @@ var lexTests = []lexTest{
 		tCloseDir,
 		tEOF,
 	}},
-	{"string", `<#if "a" == "b">`, []item{
+	{"if string eq", `<#if "a" == "b">`, []item{
 		tStartDir,
 		tIf,
 		tSpace,
@@ -112,11 +115,59 @@ var lexTests = []lexTest{
 		tCloseDir,
 		tEOF,
 	}},
-	{"bools", "<#if true>", []item{
+	{"if true", "<#if true>", []item{
 		tStartDir,
 		tIf,
 		tSpace,
 		mkItem(itemBool, "true"),
+		tCloseDir,
+		tEOF,
+	}},
+	{"if gt", "<#if a gt b>", []item{
+		tStartDir,
+		tIf,
+		tSpace,
+		mkItem(itemIdentifier, "a"),
+		tSpace,
+		tGt,
+		tSpace,
+		mkItem(itemIdentifier, "b"),
+		tCloseDir,
+		tEOF,
+	}},
+	{"if gte", "<#if a gte b>", []item{
+		tStartDir,
+		tIf,
+		tSpace,
+		mkItem(itemIdentifier, "a"),
+		tSpace,
+		tGtEq,
+		tSpace,
+		mkItem(itemIdentifier, "b"),
+		tCloseDir,
+		tEOF,
+	}},
+	{"if <", "<#if a < b>", []item{
+		tStartDir,
+		tIf,
+		tSpace,
+		mkItem(itemIdentifier, "a"),
+		tSpace,
+		tLess,
+		tSpace,
+		mkItem(itemIdentifier, "b"),
+		tCloseDir,
+		tEOF,
+	}},
+	{"if <=", "<#if a <= b>", []item{
+		tStartDir,
+		tIf,
+		tSpace,
+		mkItem(itemIdentifier, "a"),
+		tSpace,
+		tLessEq,
+		tSpace,
+		mkItem(itemIdentifier, "b"),
 		tCloseDir,
 		tEOF,
 	}},

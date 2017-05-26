@@ -40,8 +40,10 @@ func (i item) String() string {
 		return "EOF"
 	case i.typ == itemError:
 		return i.val
-	case i.typ > _itemDirective:
+	case i.typ > _itemDirectiveBeg && i.typ < _itemDirectiveEnd:
 		return fmt.Sprintf("<%s>", i.val)
+	case i.typ > _itemOperatorBeg && i.typ < _itemOperatorEnd:
+		return fmt.Sprintf("[%s]", i.val)
 	case len(i.val) > 10:
 		return fmt.Sprintf("%.10q...", i.val)
 	}
@@ -122,15 +124,19 @@ const (
 	itemStringConstant                 // string constant
 	itemSpace                          // run of spaces separating arguments
 
+	_itemOperatorBeg
 	itemAdd           // +
 	itemMinus         // -
 	itemMultiply      // *
 	itemDivide        // /
 	itemLess          // <
 	itemLessEq        // <=
+	itemGreater       // gt
+	itemGreaterEq     // gte
 	itemEq            // ==
 	itemNeq           // !=
 	itemLowestPrecOpt // "#"
+	_itemOperatorEnd
 
 	itemLeftInterpolation  // ${
 	itemRightInterpolation // }
@@ -140,8 +146,7 @@ const (
 	itemLeftParen          // (
 	itemRightParen         // )
 
-	// Directives appear after all the rest.
-	_itemDirective       // used only to delimit the directives
+	_itemDirectiveBeg
 	itemDirectiveInclude // include directive
 	itemDirectiveMacro   // macro directive
 	itemDirectiveIf      // if directive
@@ -149,10 +154,10 @@ const (
 	itemDirectiveElse    // else directive
 	itemDirectiveList    // list directive
 	itemAs               // keyword in list directive
-
+	_itemDirectiveEnd
 )
 
-var directive = map[string]itemType{
+var directives = map[string]itemType{
 	"include": itemDirectiveInclude,
 	"macro":   itemDirectiveMacro,
 	"if":      itemDirectiveIf,
@@ -160,6 +165,11 @@ var directive = map[string]itemType{
 	"else":    itemDirectiveElse,
 	"list":    itemDirectiveList,
 	"as":      itemAs,
+}
+
+var comparators = map[string]itemType{
+	"gt":  itemGreater,
+	"gte": itemGreaterEq,
 }
 
 const (
@@ -415,7 +425,7 @@ func lexDirective(l *lexer) stateFn {
 		return l.errorf("unclosed directive")
 	case isSpace(r):
 		return lexSpace
-	case r == '+' || r == '-' || ('0' <= r && r <= '9'):
+	case '0' <= r && r <= '9':
 		l.backup()
 
 		return lexNumber
@@ -423,14 +433,14 @@ func lexDirective(l *lexer) stateFn {
 		return lexString
 	case r == '\'':
 		return lexChar
-	case r == '!' || r == '=':
+	case r == '!' || r == '=' || r == '<':
 		l.backup()
 
 		return lexComparator
 	case isAlphaNumeric(r):
 		l.backup()
 
-		return lexIdentifier
+		return lexIdentifier // gt, gte are identifiers
 	case r == '(':
 		l.emit(itemLeftParen)
 		l.parenDepth++
@@ -487,8 +497,10 @@ Loop:
 			}
 
 			switch {
-			case directive[word] > _itemDirective:
-				l.emit(directive[word])
+			case directives[word] > _itemDirectiveBeg && directives[word] < _itemDirectiveEnd:
+				l.emit(directives[word])
+			case comparators[word] > _itemOperatorBeg && comparators[word] < _itemOperatorEnd:
+				l.emit(comparators[word])
 			case word == "true", word == "false":
 				l.emit(itemBool)
 			default:
@@ -538,17 +550,27 @@ func (l *lexer) atTerminator() bool {
 
 // lexComparator scans a comparator.
 func lexComparator(l *lexer) stateFn {
-	comparator := l.next()
-	r := l.next()
-	if r != '=' {
+	comparatorStart := l.next()
+	r := l.peek()
+	if r != '=' && r != ' ' {
 		return l.errorf("unexpected comparator %#U", r)
 	}
 
-	switch string(comparator) + string(r) {
+	comparator := string(comparatorStart)
+	if r == '=' {
+		r := l.next()
+		comparator += string(r)
+	}
+
+	switch comparator {
 	case "==":
 		l.emit(itemEq)
 	case "!=":
 		l.emit(itemNeq)
+	case "<":
+		l.emit(itemLess)
+	case "<=":
+		l.emit(itemLessEq)
 	}
 
 	return lexDirective
