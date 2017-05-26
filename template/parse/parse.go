@@ -378,7 +378,10 @@ func (t *Tree) directive() (n Node) {
 
 func (t *Tree) expression(context string) *ExpressionNode {
 	operatorStack := &stack{}
-	lowestPrecOperator := mkItem(itemLowestPrecOpt, "#")
+	lowestPrecOperator := item{
+		typ: itemLowestPrecOpt,
+		val: "#",
+	}
 	operatorStack.push(&lowestPrecOperator)
 
 	operandStack := &stack{}

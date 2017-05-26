@@ -19,28 +19,28 @@ package template_test
 import (
 	"log"
 	"os"
-	"strings"
 
 	"github.com/b3log/freemarker.go/template"
 )
 
-func ExampleTTT() {
+func ExampleTemplate() {
 	const letter = `
 It's a simple ${thing}.
 `
 
 	// Create a new template and parse the letter into it.
-	t := template.Must(template.New("letter").Parse(letter))
-
-	// Execute the template for each recipient.
-	for _, r := range recipients {
-		err := t.Execute(os.Stdout, r)
-		if err != nil {
-			log.Println("executing template:", err)
-		}
+	t, err := template.New("letter").Parse(letter)
+	if nil != err {
+		panic(err)
 	}
 
-	// Output:111
+	dataModel := map[string]interface{}{}
+	err = t.Execute(os.Stdout, dataModel)
+	if err != nil {
+		log.Println("executing template:", err)
+	}
+
+	// Output:
 	// Dear Aunt Mildred,
 	//
 	// It was a pleasure to see you at the wedding.
