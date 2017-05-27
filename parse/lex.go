@@ -67,6 +67,8 @@ func (i item) precedence() int {
 		return 4
 	case itemMultiply, itemDivide:
 		return 5
+	case itemDot:
+		return 6
 	}
 
 	return LowestPrec
@@ -89,6 +91,7 @@ var itemName = map[itemType]string{
 	itemDivide:         "/",
 	itemLess:           "<",
 	itemLessEq:         "<=",
+	itemDot:            ".",
 	itemCharConstant:   "char",
 	itemStringConstant: "string",
 	itemNumber:         "number",

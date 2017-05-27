@@ -55,21 +55,21 @@ func (t NodeType) Type() NodeType {
 }
 
 const (
-	NodeText       NodeType = iota // plain text
-	NodeIf                         // if directive
-	NodeBool                       // boolean constant
-	NodeChain                      // sequence of field accesses
-	NodeExpression                 // expression
-	nodeElse                       // else action. Not added to tree
-	nodeEnd                        // end action. Not added to tree
-	NodeIdentifier                 // identifier
-	NodeContent                    // list of Nodes
-	NodeNil                        // untyped nil constant
-	NodeNumber                     // numerical constant
-	NodeList                       // list directive
-	NodeString                     // string constant
-	NodeTemplate                   // template invocation action
-	NodeVariable                   // $ variable
+	NodeContent       NodeType = iota // list of Nodes
+	NodeText                          // plain text
+	NodeIdentifier                    // identifier
+	NodeInterpolation                 // interpolation
+	NodeExpression                    // expression
+	NodeBool                          // boolean constant
+	NodeNumber                        // numerical constant
+	NodeString                        // string constant
+	NodeNil                           // untyped nil constant
+	NodeIf                            // if directive
+	NodeList                          // list directive
+	nodeElse                          // else action. Not added to tree
+	nodeEnd                           // end action. Not added to tree
+
+	NodeTemplate // template invocation action
 )
 
 // Nodes.
@@ -162,15 +162,6 @@ func (c *ExpressionNode) append(node Node) {
 }
 
 func (c *ExpressionNode) String() string {
-	if c.operator == itemLowestPrecOpt {
-		switch operand := c.Nodes[0]; operand.Type() {
-		case NodeIdentifier:
-			return "${" + operand.String() + "}"
-		default:
-			return operand.String()
-		}
-	}
-
 	s := ""
 	for i, node := range c.Nodes {
 		if i > 0 {
@@ -495,6 +486,30 @@ func (e *elseNode) tree() *Tree {
 
 func (e *elseNode) Copy() Node {
 	return e.tr.newElse(e.Pos)
+}
+
+// InterpolationNode represents a ${expr}.
+type InterpolationNode struct {
+	NodeType
+	Pos
+	tr   *Tree
+	Expr *ExpressionNode
+}
+
+func (t *Tree) newInterpolation(pos Pos, expr *ExpressionNode) *InterpolationNode {
+	return &InterpolationNode{tr: t, NodeType: NodeIf, Pos: pos, Expr: expr}
+}
+
+func (interpolationNode *InterpolationNode) String() string {
+	return fmt.Sprintf("${%s}", interpolationNode.Expr)
+}
+
+func (interpolationNode *InterpolationNode) tree() *Tree {
+	return interpolationNode.tr
+}
+
+func (i *InterpolationNode) Copy() Node {
+	return i.tr.newInterpolation(i.Pos, i.Expr.CopyExpr())
 }
 
 // IfNode represents a <#if> directive.

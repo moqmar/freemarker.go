@@ -347,7 +347,7 @@ func (t *Tree) textOrInterpolationOrDirective() Node {
 	case itemText:
 		return t.newText(token.pos, token.val)
 	case itemLeftInterpolation:
-		return t.interpolation()
+		return t.interpolation(token.pos)
 	case itemStartDirective:
 		return t.directive()
 	case itemEndDirective:
@@ -362,10 +362,13 @@ func (t *Tree) textOrInterpolationOrDirective() Node {
 	return nil
 }
 
-func (t *Tree) interpolation() Node {
+// Interpolation:
+//	${expr}
+// ${ is past.
+func (t *Tree) interpolation(pos Pos) Node {
 	expr := t.expression("interpolation")
 
-	return expr
+	return t.newInterpolation(pos, expr)
 }
 
 func (t *Tree) directive() Node {
@@ -396,18 +399,10 @@ func (t *Tree) expression(context string) *ExpressionNode {
 
 	for {
 		token := t.nextNonSpace()
-		//		fmt.Println(token, token.typ)
 
 		switch token.typ {
 		case itemCloseDirective, itemRightInterpolation:
 			topOperator := operatorStack.pop()
-			if &lowestPrecOperator == topOperator.(*item) {
-				expr := t.newExpression(token.pos, itemLowestPrecOpt)
-				expr.append(operandStack.pop().(Node))
-
-				return expr
-			}
-
 			bottomOperator := operatorStack.pop()
 			if nil == bottomOperator {
 				t.unexpected(token, context)
@@ -418,8 +413,10 @@ func (t *Tree) expression(context string) *ExpressionNode {
 			}
 
 			expr := t.newExpression(token.pos, topOperator.(*item).typ)
-			expr.append(operandStack.pop().(Node))
-			expr.append(operandStack.pop().(Node))
+			second := operandStack.pop().(Node)
+			first := operandStack.pop().(Node)
+			expr.append(first)
+			expr.append(second)
 
 			return expr
 		case itemBool:
@@ -439,26 +436,21 @@ func (t *Tree) expression(context string) *ExpressionNode {
 			operandStack.push(str)
 		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq, itemEq, itemNeq, itemDot:
 			topOperator := operatorStack.peek()
-			if lowestPrecOperator == topOperator {
-				operatorStack.push(&token)
-
-				continue
-			}
-
-			if token.precedence() >= topOperator.(*item).precedence() {
+			if lowestPrecOperator == topOperator || token.precedence() >= topOperator.(*item).precedence() {
 				operatorStack.push(&token)
 
 				continue
 			}
 
 			operExpr := t.newExpression(token.pos, topOperator.(*item).typ)
-			operExpr.append(operandStack.pop().(Node))
-			operExpr.append(operandStack.pop().(Node))
+			second := operandStack.pop().(Node)
+			first := operandStack.pop().(Node)
+			operExpr.append(first)
+			operExpr.append(second)
 			operandStack.push(operExpr)
 
 			t.backup()
 		default:
-			fmt.Println("!!!!")
 			t.unexpected(token, context)
 		}
 	}
