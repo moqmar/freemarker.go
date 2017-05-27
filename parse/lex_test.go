@@ -56,6 +56,7 @@ var (
 	tGtEq     = mkItem(itemGreaterEq, "gte")
 	tLess     = mkItem(itemLess, "<")
 	tLessEq   = mkItem(itemLessEq, "<=")
+	tDot      = mkItem(itemDot, ".")
 )
 
 var lexTests = []lexTest{
@@ -68,20 +69,32 @@ var lexTests = []lexTest{
 		tEOF,
 	}},
 	{"empty interpolation", `${}`, []item{tLinter, tRinter, tEOF}},
-	{"interpolation iden", "111${abc}222", []item{
-		mkItem(itemText, "111"),
+	{"interpolation iden", "hello${abc}world", []item{
+		mkItem(itemText, "hello"),
 		tLinter,
 		mkItem(itemIdentifier, "abc"),
 		tRinter,
-		mkItem(itemText, "222"),
+		mkItem(itemText, "world"),
 		tEOF,
 	}},
-	{"interpolation num", "111${1.5}222", []item{
-		mkItem(itemText, "111"),
+	{"interpolation iden.field", "hello${a.b.c}world", []item{
+		mkItem(itemText, "hello"),
+		tLinter,
+		mkItem(itemIdentifier, "a"),
+		tDot,
+		mkItem(itemIdentifier, "b"),
+		tDot,
+		mkItem(itemIdentifier, "c"),
+		tRinter,
+		mkItem(itemText, "world"),
+		tEOF,
+	}},
+	{"interpolation num", "hello${1.5}world", []item{
+		mkItem(itemText, "hello"),
 		tLinter,
 		mkItem(itemNumber, "1.5"),
 		tRinter,
-		mkItem(itemText, "222"),
+		mkItem(itemText, "world"),
 		tEOF,
 	}},
 	{"list", "<#list animals as animal>", []item{
@@ -236,11 +249,11 @@ func TestLex(t *testing.T) {
 
 var lexPosTests = []lexTest{
 	{"empty", "", []item{tEOF}},
-	{"sample", "${abcd}", []item{
+	{"sample", "${abc}", []item{
 		{itemLeftInterpolation, 0, "${", 1},
-		{itemIdentifier, 2, "abcd", 1},
-		{itemRightInterpolation, 6, "}", 1},
-		{itemEOF, 7, "", 1},
+		{itemIdentifier, 2, "abc", 1},
+		{itemRightInterpolation, 5, "}", 1},
+		{itemEOF, 6, "", 1},
 	}},
 }
 

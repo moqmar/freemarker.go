@@ -228,39 +228,6 @@ func (i *IdentifierNode) Copy() Node {
 	return &IdentifierNode{tr: i.tr, NodeType: i.NodeType, Pos: i.Pos, Ident: i.Ident}
 }
 
-// VariableNode holds a list of variable names, possibly with chained field
-// accesses.
-type VariableNode struct {
-	NodeType
-	Pos
-	tr    *Tree
-	Ident []string // Variable name and fields in lexical order.
-}
-
-func (t *Tree) newVariable(pos Pos, ident string) *VariableNode {
-	return &VariableNode{tr: t, NodeType: NodeVariable, Pos: pos, Ident: strings.Split(ident, ".")}
-}
-
-func (v *VariableNode) String() string {
-	s := ""
-	for i, id := range v.Ident {
-		if i > 0 {
-			s += "."
-		}
-		s += id
-	}
-
-	return s
-}
-
-func (v *VariableNode) tree() *Tree {
-	return v.tr
-}
-
-func (v *VariableNode) Copy() Node {
-	return &VariableNode{tr: v.tr, NodeType: NodeVariable, Pos: v.Pos, Ident: append([]string{}, v.Ident...)}
-}
-
 // NilNode holds the special identifier 'nil' representing an untyped nil constant.
 type NilNode struct {
 	NodeType

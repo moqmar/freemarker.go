@@ -437,7 +437,7 @@ func (t *Tree) expression(context string) *ExpressionNode {
 		case itemStringConstant:
 			str := t.newString(token.pos, token.val)
 			operandStack.push(str)
-		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq, itemEq, itemNeq:
+		case itemAdd, itemMinus, itemMultiply, itemDivide, itemLess, itemLessEq, itemEq, itemNeq, itemDot:
 			topOperator := operatorStack.peek()
 			if lowestPrecOperator == topOperator {
 				operatorStack.push(&token)
@@ -458,6 +458,7 @@ func (t *Tree) expression(context string) *ExpressionNode {
 
 			t.backup()
 		default:
+			fmt.Println("!!!!")
 			t.unexpected(token, context)
 		}
 	}
