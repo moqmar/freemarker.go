@@ -291,7 +291,7 @@ func (t *Tree) parse() {
 	t.Root = t.newContent(t.peek().pos)
 
 	for t.peek().typ != itemEOF {
-		switch n := t.textOrDirective(); n.Type() {
+		switch n := t.textOrInterpolationOrDirective(); n.Type() {
 		case nodeEnd, nodeElse:
 			t.errorf("unexpected %s", n)
 		default:
@@ -325,7 +325,7 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 	content = t.newContent(t.peekNonSpace().pos)
 
 	for t.peekNonSpace().typ != itemEOF {
-		n := t.textOrDirective()
+		n := t.textOrInterpolationOrDirective()
 
 		switch n.Type() {
 		case nodeEnd, nodeElse:
@@ -340,12 +340,14 @@ func (t *Tree) itemContent() (content *ContentNode, next Node) {
 	return
 }
 
-func (t *Tree) textOrDirective() Node {
+func (t *Tree) textOrInterpolationOrDirective() Node {
 	token := t.nextNonSpace()
 
 	switch token.typ {
 	case itemText:
 		return t.newText(token.pos, token.val)
+	case itemLeftInterpolation:
+		return t.interpolation()
 	case itemStartDirective:
 		return t.directive()
 	case itemEndDirective:
@@ -360,7 +362,13 @@ func (t *Tree) textOrDirective() Node {
 	return nil
 }
 
-func (t *Tree) directive() (n Node) {
+func (t *Tree) interpolation() Node {
+	expr := t.expression("interpolation")
+
+	return expr
+}
+
+func (t *Tree) directive() Node {
 	switch token := t.nextNonSpace(); token.typ {
 	case itemDirectiveIf:
 		return t.ifControl()
@@ -388,10 +396,18 @@ func (t *Tree) expression(context string) *ExpressionNode {
 
 	for {
 		token := t.nextNonSpace()
+		//		fmt.Println(token, token.typ)
 
 		switch token.typ {
-		case itemCloseDirective:
+		case itemCloseDirective, itemRightInterpolation:
 			topOperator := operatorStack.pop()
+			if &lowestPrecOperator == topOperator.(*item) {
+				expr := t.newExpression(token.pos, itemLowestPrecOpt)
+				expr.append(operandStack.pop().(Node))
+
+				return expr
+			}
+
 			bottomOperator := operatorStack.pop()
 			if nil == bottomOperator {
 				t.unexpected(token, context)

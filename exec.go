@@ -17,7 +17,6 @@
 package template
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"reflect"

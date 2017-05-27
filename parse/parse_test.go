@@ -75,7 +75,9 @@ var parseTests = []parseTest{
 	{"comment", "hello-<#--\n\n\n-->-world", noError, `"hello-""-world"`},
 	{"spaces", " \t\n", noError, `" \t\n"`},
 	{"text", "some text", noError, `"some text"`},
-	{"emptyDirective", "<#if></#if>", hasError, ``},
+	{"interpolation iden", "111${abc}222", noError, `"111"${abc}"222"`},
+	{"interpolation iden.", "111${a.b.c}222", noError, `111${a.b.c}222`},
+	{"true if", "<#if true></#if>", noError, `<#if true></#if>`},
 	{"simple if", "<#if a == b>true content</#if>following content", noError,
 		`<#if b==a>"true content"</#if>"following content"`},
 }

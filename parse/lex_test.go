@@ -68,16 +68,20 @@ var lexTests = []lexTest{
 		tEOF,
 	}},
 	{"empty interpolation", `${}`, []item{tLinter, tRinter, tEOF}},
-	{"expression1", "${abc}", []item{
+	{"interpolation iden", "111${abc}222", []item{
+		mkItem(itemText, "111"),
 		tLinter,
 		mkItem(itemIdentifier, "abc"),
 		tRinter,
+		mkItem(itemText, "222"),
 		tEOF,
 	}},
-	{"expression2", "${1.5}", []item{
+	{"interpolation num", "111${1.5}222", []item{
+		mkItem(itemText, "111"),
 		tLinter,
 		mkItem(itemNumber, "1.5"),
 		tRinter,
+		mkItem(itemText, "222"),
 		tEOF,
 	}},
 	{"list", "<#list animals as animal>", []item{

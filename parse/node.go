@@ -162,6 +162,15 @@ func (c *ExpressionNode) append(node Node) {
 }
 
 func (c *ExpressionNode) String() string {
+	if c.operator == itemLowestPrecOpt {
+		switch operand := c.Nodes[0]; operand.Type() {
+		case NodeIdentifier:
+			return "${" + operand.String() + "}"
+		default:
+			return operand.String()
+		}
+	}
+
 	s := ""
 	for i, node := range c.Nodes {
 		if i > 0 {
@@ -220,7 +229,7 @@ func (i *IdentifierNode) Copy() Node {
 }
 
 // VariableNode holds a list of variable names, possibly with chained field
-// accesses. The dollar sign is part of the (first) name.
+// accesses.
 type VariableNode struct {
 	NodeType
 	Pos
@@ -240,6 +249,7 @@ func (v *VariableNode) String() string {
 		}
 		s += id
 	}
+
 	return s
 }
 
@@ -279,52 +289,6 @@ func (n *NilNode) tree() *Tree {
 
 func (n *NilNode) Copy() Node {
 	return n.tr.newNil(n.Pos)
-}
-
-// ChainNode holds a term followed by a chain of field accesses (identifier starting with '.').
-// The names may be chained ('.x.y').
-// The periods are dropped from each ident.
-type ChainNode struct {
-	NodeType
-	Pos
-	tr    *Tree
-	Node  Node
-	Field []string // The identifiers in lexical order.
-}
-
-func (t *Tree) newChain(pos Pos, node Node) *ChainNode {
-	return &ChainNode{tr: t, NodeType: NodeChain, Pos: pos, Node: node}
-}
-
-// Add adds the named field (which should start with a period) to the end of the chain.
-func (c *ChainNode) Add(field string) {
-	if len(field) == 0 || field[0] != '.' {
-		panic("no dot in field")
-	}
-	field = field[1:] // Remove leading dot.
-	if field == "" {
-		panic("empty field")
-	}
-	c.Field = append(c.Field, field)
-}
-
-func (c *ChainNode) String() string {
-	s := c.Node.String()
-	if _, ok := c.Node.(*ExpressionNode); ok {
-		s = "(" + s + ")"
-	}
-	for _, field := range c.Field {
-		s += "." + field
-	}
-	return s
-}
-
-func (c *ChainNode) tree() *Tree {
-	return c.tr
-}
-
-func (c *ChainNode) Copy() Node {
-	return &ChainNode{tr: c.tr, NodeType: NodeChain, Pos: c.Pos, Node: c.Node, Field: append([]string{}, c.Field...)}
 }
 
 // BoolNode holds a boolean constant.
