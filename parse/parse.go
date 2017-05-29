@@ -404,11 +404,7 @@ func (t *Tree) expression(context string) *ExpressionNode {
 		case itemCloseDirective, itemRightInterpolation:
 			topOperator := operatorStack.pop()
 			bottomOperator := operatorStack.pop()
-			if nil == bottomOperator {
-				t.unexpected(token, context)
-			}
-
-			if &lowestPrecOperator != bottomOperator.(*item) {
+			if nil == bottomOperator || &lowestPrecOperator != bottomOperator.(*item) {
 				t.unexpected(token, context)
 			}
 
