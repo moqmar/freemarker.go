@@ -67,6 +67,8 @@ func (i item) precedence() int {
 		return 4
 	case itemMultiply, itemDivide:
 		return 5
+	case itemDot:
+		return 6
 	}
 
 	return LowestPrec
@@ -89,6 +91,7 @@ var itemName = map[itemType]string{
 	itemDivide:         "/",
 	itemLess:           "<",
 	itemLessEq:         "<=",
+	itemDot:            ".",
 	itemCharConstant:   "char",
 	itemStringConstant: "string",
 	itemNumber:         "number",
@@ -135,6 +138,7 @@ const (
 	itemGreaterEq     // gte
 	itemEq            // ==
 	itemNeq           // !=
+	itemDot           // .
 	itemLowestPrecOpt // "#"
 	_itemOperatorEnd
 
@@ -324,7 +328,7 @@ func lexText(l *lexer) stateFn {
 			l.emit(itemText)
 		}
 
-		return lexLeftInterpolation
+		return lexInterpolation
 	}
 
 	if x := strings.Index(l.input[l.pos:], leftComment); x >= 0 {
@@ -366,20 +370,12 @@ func lexText(l *lexer) stateFn {
 	return nil
 }
 
-// lexLeftInterpolation scans the left interpolation "${".
-func lexLeftInterpolation(l *lexer) stateFn {
+// lexInterpolation scans the interpolation "${".
+func lexInterpolation(l *lexer) stateFn {
 	l.pos += Pos(len(leftInterpolation))
 	l.emit(itemLeftInterpolation)
 
-	return lexDirective
-}
-
-// lexRightInterpolation scans the right interpolation "}", which is known to be present.
-func lexRightInterpolation(l *lexer) stateFn {
-	l.pos += Pos(len(rightInterpolation))
-	l.emit(itemRightInterpolation)
-
-	return lexText
+	return lexExpression
 }
 
 // lexComment scans a comment <#-- comment -->.
@@ -397,24 +393,27 @@ func lexComment(l *lexer) stateFn {
 	return lexText
 }
 
-// lexDirective scans the directive inside FTL tags.
-func lexDirective(l *lexer) stateFn {
-	if strings.HasPrefix(l.input[l.pos:], startDirective) {
-		l.pos += Pos(len(startDirective))
-		l.emit(itemStartDirective)
-	}
-
-	if strings.HasPrefix(l.input[l.pos:], endDirective) {
-		l.pos += Pos(len(endDirective))
-		l.emit(itemEndDirective)
-	}
-
+// lexExpression scans the expression inside an interpolation or a directive.
+// ${ or <# has already been seen.
+func lexExpression(l *lexer) stateFn {
 	r := l.next()
 	switch {
 	case r == eof || isEndOfLine(r):
 		return l.errorf("unclosed directive")
 	case isSpace(r):
 		return lexSpace
+	case r == '.':
+		// special look-ahead for ".field" so we don't break l.backup().
+		if l.pos < Pos(len(l.input)) {
+			r := l.input[l.pos]
+			if r < '0' || '9' < r {
+				l.emit(itemDot)
+
+				return lexDirective
+			}
+		}
+
+		fallthrough // '.' can start a number.
 	case '0' <= r && r <= '9':
 		l.backup()
 
@@ -441,10 +440,6 @@ func lexDirective(l *lexer) stateFn {
 		if l.parenDepth < 0 {
 			return l.errorf("unexpected right paren %#U", r)
 		}
-	//case r <= unicode.MaxASCII && unicode.IsPrint(r):
-	//	l.emit(itemCharConstant)
-	//
-	//	return lexDirective
 	case r == '>':
 		l.emit(itemCloseDirective)
 
@@ -457,7 +452,22 @@ func lexDirective(l *lexer) stateFn {
 		return l.errorf("unrecognized character in action: %#U", r)
 	}
 
-	return lexDirective
+	return lexExpression
+}
+
+// lexDirective scans the directive inside FTL tags.
+func lexDirective(l *lexer) stateFn {
+	if strings.HasPrefix(l.input[l.pos:], startDirective) {
+		l.pos += Pos(len(startDirective))
+		l.emit(itemStartDirective)
+	}
+
+	if strings.HasPrefix(l.input[l.pos:], endDirective) {
+		l.pos += Pos(len(endDirective))
+		l.emit(itemEndDirective)
+	}
+
+	return lexExpression
 }
 
 // lexSpace scans a run of space characters.
@@ -482,6 +492,7 @@ Loop:
 		default:
 			l.backup()
 			word := l.input[l.start:l.pos]
+
 			if !l.atTerminator() {
 				return l.errorf("bad character %#U", r)
 			}
@@ -504,18 +515,6 @@ Loop:
 	return lexDirective
 }
 
-// lexVariable scans a Variable: $Alphanumeric.
-// The $ has been scanned.
-func lexVariable(l *lexer) stateFn {
-	if l.atTerminator() {
-		// Nothing interesting follows -> "$".
-		//		l.emit(itemVariable)
-		return lexDirective
-	}
-	//	return lexFieldOrVariable(l, itemVariable)
-	return nil
-}
-
 // atTerminator reports whether the input is at valid termination character to
 // appear after an identifier.
 func (l *lexer) atTerminator() bool {
@@ -525,13 +524,8 @@ func (l *lexer) atTerminator() bool {
 	}
 
 	switch r {
-	case eof, '.', ',', '|', ':', ')', '(', '>':
-		return true
-	}
-	// Does r start the delimiter? This can be ambiguous (with delim=="//", $x/2 will
-	// succeed but should fail) but only in extremely rare cases caused by willfully
-	// bad choice of delimiter.
-	if rd, _ := utf8.DecodeRuneInString(rightInterpolation); rd == r {
+	case eof, '.', ',', '|', ':', ')', '(', '>', '}':
+
 		return true
 	}
 
@@ -627,6 +621,7 @@ func lexNumber(l *lexer) stateFn {
 	} else {
 		l.emit(itemNumber)
 	}
+
 	return lexDirective
 }
 

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/b3log/freemarker.go/template/parse"
+	"github.com/b3log/freemarker.go/parse"
 )
 
 // missingKeyAction defines how to respond to indexing a map with a key that is not present.
@@ -42,9 +42,7 @@ type common struct {
 	execFuncs map[string]reflect.Value
 }
 
-// Template is the representation of a parsed template. The *parse.Tree
-// field is exported only for use by html/template and should be treated
-// as unexported by all other clients.
+// Template is the representation of a parsed template.
 type Template struct {
 	name string
 	*parse.Tree

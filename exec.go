@@ -17,7 +17,6 @@
 package template
 
 import (
-	"bytes"
 	"fmt"
 	"io"
 	"reflect"
@@ -25,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/b3log/freemarker.go/template/parse"
+	"github.com/b3log/freemarker.go/parse"
 )
 
 // maxExecDepth specifies the maximum stack depth of templates within
@@ -207,31 +206,6 @@ func (t *Template) execute(wr io.Writer, data interface{}) (err error) {
 	}
 	state.walk(value, t.Root)
 	return
-}
-
-// DefinedTemplates returns a string listing the defined templates,
-// prefixed by the string "; defined templates are: ". If there are none,
-// it returns the empty string. For generating an error message here
-// and in html/template.
-func (t *Template) DefinedTemplates() string {
-	if t.common == nil {
-		return ""
-	}
-	var b bytes.Buffer
-	for name, tmpl := range t.tmpl {
-		if tmpl.Tree == nil || tmpl.Root == nil {
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(&b, "%q", name)
-	}
-	var s string
-	if b.Len() > 0 {
-		s = "; defined templates are: " + b.String()
-	}
-	return s
 }
 
 // Walk functions step through the major pieces of the template structure,

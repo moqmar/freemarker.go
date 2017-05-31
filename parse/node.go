@@ -55,21 +55,21 @@ func (t NodeType) Type() NodeType {
 }
 
 const (
-	NodeText       NodeType = iota // plain text
-	NodeIf                         // if directive
-	NodeBool                       // boolean constant
-	NodeChain                      // sequence of field accesses
-	NodeExpression                 // expression
-	nodeElse                       // else action. Not added to tree
-	nodeEnd                        // end action. Not added to tree
-	NodeIdentifier                 // identifier
-	NodeContent                    // list of Nodes
-	NodeNil                        // untyped nil constant
-	NodeNumber                     // numerical constant
-	NodeList                       // list directive
-	NodeString                     // string constant
-	NodeTemplate                   // template invocation action
-	NodeVariable                   // $ variable
+	NodeContent       NodeType = iota // list of Nodes
+	NodeText                          // plain text
+	NodeIdentifier                    // identifier
+	NodeInterpolation                 // interpolation
+	NodeExpression                    // expression
+	NodeBool                          // boolean constant
+	NodeNumber                        // numerical constant
+	NodeString                        // string constant
+	NodeNil                           // untyped nil constant
+	NodeIf                            // if directive
+	NodeList                          // list directive
+	nodeElse                          // else action. Not added to tree
+	nodeEnd                           // end action. Not added to tree
+
+	NodeTemplate // template invocation action
 )
 
 // Nodes.
@@ -219,38 +219,6 @@ func (i *IdentifierNode) Copy() Node {
 	return &IdentifierNode{tr: i.tr, NodeType: i.NodeType, Pos: i.Pos, Ident: i.Ident}
 }
 
-// VariableNode holds a list of variable names, possibly with chained field
-// accesses. The dollar sign is part of the (first) name.
-type VariableNode struct {
-	NodeType
-	Pos
-	tr    *Tree
-	Ident []string // Variable name and fields in lexical order.
-}
-
-func (t *Tree) newVariable(pos Pos, ident string) *VariableNode {
-	return &VariableNode{tr: t, NodeType: NodeVariable, Pos: pos, Ident: strings.Split(ident, ".")}
-}
-
-func (v *VariableNode) String() string {
-	s := ""
-	for i, id := range v.Ident {
-		if i > 0 {
-			s += "."
-		}
-		s += id
-	}
-	return s
-}
-
-func (v *VariableNode) tree() *Tree {
-	return v.tr
-}
-
-func (v *VariableNode) Copy() Node {
-	return &VariableNode{tr: v.tr, NodeType: NodeVariable, Pos: v.Pos, Ident: append([]string{}, v.Ident...)}
-}
-
 // NilNode holds the special identifier 'nil' representing an untyped nil constant.
 type NilNode struct {
 	NodeType
@@ -279,52 +247,6 @@ func (n *NilNode) tree() *Tree {
 
 func (n *NilNode) Copy() Node {
 	return n.tr.newNil(n.Pos)
-}
-
-// ChainNode holds a term followed by a chain of field accesses (identifier starting with '.').
-// The names may be chained ('.x.y').
-// The periods are dropped from each ident.
-type ChainNode struct {
-	NodeType
-	Pos
-	tr    *Tree
-	Node  Node
-	Field []string // The identifiers in lexical order.
-}
-
-func (t *Tree) newChain(pos Pos, node Node) *ChainNode {
-	return &ChainNode{tr: t, NodeType: NodeChain, Pos: pos, Node: node}
-}
-
-// Add adds the named field (which should start with a period) to the end of the chain.
-func (c *ChainNode) Add(field string) {
-	if len(field) == 0 || field[0] != '.' {
-		panic("no dot in field")
-	}
-	field = field[1:] // Remove leading dot.
-	if field == "" {
-		panic("empty field")
-	}
-	c.Field = append(c.Field, field)
-}
-
-func (c *ChainNode) String() string {
-	s := c.Node.String()
-	if _, ok := c.Node.(*ExpressionNode); ok {
-		s = "(" + s + ")"
-	}
-	for _, field := range c.Field {
-		s += "." + field
-	}
-	return s
-}
-
-func (c *ChainNode) tree() *Tree {
-	return c.tr
-}
-
-func (c *ChainNode) Copy() Node {
-	return &ChainNode{tr: c.tr, NodeType: NodeChain, Pos: c.Pos, Node: c.Node, Field: append([]string{}, c.Field...)}
 }
 
 // BoolNode holds a boolean constant.
@@ -564,6 +486,30 @@ func (e *elseNode) tree() *Tree {
 
 func (e *elseNode) Copy() Node {
 	return e.tr.newElse(e.Pos)
+}
+
+// InterpolationNode represents a ${expr}.
+type InterpolationNode struct {
+	NodeType
+	Pos
+	tr   *Tree
+	Expr *ExpressionNode
+}
+
+func (t *Tree) newInterpolation(pos Pos, expr *ExpressionNode) *InterpolationNode {
+	return &InterpolationNode{tr: t, NodeType: NodeIf, Pos: pos, Expr: expr}
+}
+
+func (interpolationNode *InterpolationNode) String() string {
+	return fmt.Sprintf("${%s}", interpolationNode.Expr)
+}
+
+func (interpolationNode *InterpolationNode) tree() *Tree {
+	return interpolationNode.tr
+}
+
+func (i *InterpolationNode) Copy() Node {
+	return i.tr.newInterpolation(i.Pos, i.Expr.CopyExpr())
 }
 
 // IfNode represents a <#if> directive.

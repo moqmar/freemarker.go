@@ -20,7 +20,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/b3log/freemarker.go/template"
+	"github.com/b3log/freemarker.go"
 )
 
 func ExampleTemplate() {
