@@ -15,7 +15,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 // Package parse builds parse trees for FreeMarker templates. Clients should use
-// github.com/b3log/freemarker.go package to construct templates rather than
+// github.com/moqmar/freemarker.go package to construct templates rather than
 // this one, which provides shared internal data structures not intended for
 // general use.
 package parse

@@ -20,7 +20,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/b3log/freemarker.go/parse"
+	"github.com/moqmar/freemarker.go/parse"
 )
 
 // missingKeyAction defines how to respond to indexing a map with a key that is not present.

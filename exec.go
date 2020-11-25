@@ -24,7 +24,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/b3log/freemarker.go/parse"
+	"github.com/moqmar/freemarker.go/parse"
 )
 
 // maxExecDepth specifies the maximum stack depth of templates within
